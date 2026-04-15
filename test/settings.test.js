@@ -99,6 +99,13 @@ describe('settings.js', () => {
     assert.strictEqual(settings.hooks.SessionStart[0].hooks[0].command, 'echo existing');
   });
 
+  it('addHook is idempotent — does not duplicate', () => {
+    const settings = {};
+    addHook(settings, '/path/to/cc-agents-md.sh');
+    addHook(settings, '/path/to/cc-agents-md.sh');
+    assert.strictEqual(settings.hooks.SessionStart.length, 1);
+  });
+
   it('removeHook with exact path removes only that entry', () => {
     const hookPath = '/home/user/.claude/hooks/cc-agents-md.sh';
     const settings = {

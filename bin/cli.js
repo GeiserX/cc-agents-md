@@ -1,13 +1,19 @@
 #!/usr/bin/env node
 'use strict';
 
-const { copyFileSync, unlinkSync, existsSync, chmodSync, statSync, readFileSync } = require('fs');
-const { join, dirname, resolve } = require('path');
-const { execSync } = require('child_process');
+const { copyFileSync, unlinkSync, existsSync, chmodSync, statSync, readFileSync, realpathSync } = require('fs');
+const { join, dirname } = require('path');
+const { execSync, execFileSync } = require('child_process');
 const { mkdirSync } = require('fs');
 const { readSettings, writeSettings, isInstalled, addHook, removeHook } = require('../lib/settings');
 
-const CLAUDE_DIR = join(process.env.HOME, '.claude');
+const HOME = process.env.HOME || process.env.USERPROFILE;
+if (!HOME) {
+  console.error('Error: HOME environment variable is not set.');
+  process.exit(1);
+}
+
+const CLAUDE_DIR = join(HOME, '.claude');
 const HOOK_DIR = join(CLAUDE_DIR, 'hooks');
 const HOOK_SCRIPT = join(HOOK_DIR, 'cc-agents-md.sh');
 const SETTINGS_PATH = join(CLAUDE_DIR, 'settings.json');
@@ -23,8 +29,9 @@ function findAgentsMd(from, root) {
   }
 
   const files = [];
-  let dir = resolve(from);
-  root = resolve(root);
+  let dir;
+  try { dir = realpathSync(from); } catch { dir = from; }
+  try { root = realpathSync(root); } catch { /* keep as-is */ }
 
   while (true) {
     const candidate = join(dir, 'AGENTS.md');
@@ -70,7 +77,13 @@ function remove() {
   removeHook(settings, HOOK_SCRIPT);
   writeSettings(SETTINGS_PATH, settings);
 
-  try { unlinkSync(HOOK_SCRIPT); } catch {}
+  try {
+    unlinkSync(HOOK_SCRIPT);
+  } catch (err) {
+    if (err.code !== 'ENOENT') {
+      console.warn(`Warning: Could not remove ${HOOK_SCRIPT}: ${err.message}`);
+    }
+  }
 
   console.log('Removed successfully.');
 }
@@ -149,9 +162,14 @@ function preview() {
   }
 
   try {
-    const output = execSync(`bash "${HOOK_SCRIPT}"`, {
+    const env = { ...process.env };
+    if (!env.CLAUDE_PROJECT_DIR) {
+      env.CLAUDE_PROJECT_DIR = process.cwd();
+    }
+    const output = execFileSync('bash', [HOOK_SCRIPT], {
       encoding: 'utf8',
-      env: { ...process.env, CLAUDE_PROJECT_DIR: process.cwd() }
+      env,
+      timeout: 10000
     });
     if (output.trim()) {
       process.stdout.write(output);
