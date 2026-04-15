@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 200" width="900" height="200">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#6366f1"/>
+      <stop offset="100%" stop-color="#0D1B2A"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.2"/>
+      <stop offset="100%" stop-color="#ffffff" stop-opacity="0.05"/>
+    </linearGradient>
+  </defs>
+  <rect width="900" height="200" rx="12" fill="url(#bg)"/>
+  <g transform="translate(60, 55)">
+    <rect x="0" y="15" width="50" height="50" rx="8" fill="url(#glow)" stroke="#ffffff" stroke-width="2" opacity="0.9"/>
+    <text x="25" y="47" text-anchor="middle" font-family="monospace" font-size="13" fill="#ffffff" opacity="0.8">MD</text>
+    <path d="M 56 40 L 80 40" stroke="#ffffff" stroke-width="2" stroke-dasharray="4,3" opacity="0.6"/>
+    <polygon points="76,36 82,40 76,44" fill="#ffffff" opacity="0.6"/>
+    <rect x="88" y="15" width="50" height="50" rx="8" fill="url(#glow)" stroke="#ffffff" stroke-width="2" opacity="0.9"/>
+    <text x="113" y="47" text-anchor="middle" font-family="monospace" font-size="10" fill="#ffffff" opacity="0.8">CLI</text>
+  </g>
+  <text x="220" y="95" font-family="sans-serif" font-size="42" font-weight="700" fill="#ffffff" letter-spacing="-1">agents-md-loader</text>
+  <text x="222" y="128" font-family="sans-serif" font-size="16" fill="#ffffff" opacity="0.65">Load AGENTS.md into Claude Code sessions automatically</text>
+</svg>
