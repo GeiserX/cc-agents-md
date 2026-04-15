@@ -36,9 +36,22 @@ async function l59(H,_,q){
 
 The patch wraps this with a fallback: if reading `CLAUDE.md` fails, it tries `AGENTS.md` in the same directory before returning an error. Variable names change per Claude Code version, so the regex uses capture groups.
 
+## Next — Bun-format-aware native patching
+
+The Homebrew binary is a Bun standalone (190MB Mach-O). The `__BUN.__bun` section (120MB) contains:
+
+- **Source text** (0-11MB): original JS source — first reader function copy
+- **Compiled bytecode** (12-104MB): Bun's pre-compiled format
+- **Source text copy** (105-118MB): second copy — second reader function
+- **Trailer**: module metadata + `---- Bun! ----` magic
+
+Current limitation: in-place byte replacement requires null padding after the reader function, but the binary is tightly packed (next function starts immediately). The patch adds ~138 bytes per location, and there's zero room.
+
+Section expansion (shifting bytes within the segment) breaks Bun's internal bytecode offsets. Proper fix requires understanding and updating the Bun standalone trailer format.
+
 ## Future ideas
 
-- **LIEF-based native patching** — proper Bun section extraction/repacking for native binaries (currently uses direct byte replacement)
+- **Bun standalone format parser** — parse the trailer to find source region boundaries, expand source without breaking bytecode offsets
 - **Auto-repatch** — detect Claude Code updates and re-apply the patch automatically
 - **Windows support** — PowerShell-based loader for Windows users
 - **Caching** — skip re-reading unchanged AGENTS.md files across sessions
