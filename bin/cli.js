@@ -6,6 +6,9 @@ const { join, dirname } = require('path');
 const { execSync, execFileSync } = require('child_process');
 const { mkdirSync } = require('fs');
 const { readSettings, writeSettings, isInstalled, addHook, removeHook } = require('../lib/settings');
+const { detectInstallation } = require('../lib/detect');
+const { patchNpm, unpatchNpm, isPatched: isPatchedSource } = require('../lib/patcher');
+const { patchNative, unpatchNative } = require('../lib/patch-native');
 
 const HOME = process.env.HOME || process.env.USERPROFILE;
 if (!HOME) {
@@ -182,19 +185,105 @@ function preview() {
   }
 }
 
+function patch() {
+  const dryRun = process.argv.includes('--dry-run');
+  const force = process.argv.includes('--force');
+
+  console.log('\x1b[33m⚠  EXPERIMENTAL: This modifies Claude Code internals.\x1b[0m');
+  console.log('   Patches may break after Claude Code updates.');
+  console.log('   Run "cc-agents-md unpatch" to restore at any time.\n');
+
+  const install = detectInstallation();
+
+  if (!install.type) {
+    console.error('Could not find Claude Code installation.');
+    console.error('Ensure Claude Code is installed via npm or Homebrew.');
+    process.exit(1);
+  }
+
+  console.log(`Detected: ${install.type} installation`);
+  console.log(`Path:     ${install.path}`);
+  if (install.version) console.log(`Version:  ${install.version}`);
+  console.log();
+
+  let result;
+  if (install.type === 'npm') {
+    result = patchNpm(install.path, { dryRun });
+  } else if (install.type === 'native') {
+    if (!force) {
+      console.log('Native binary patching is risky — it modifies a signed executable.');
+      console.log('Use --force to proceed, or install via npm for safer patching:');
+      console.log('  npm install -g @anthropic-ai/claude-code');
+      process.exit(1);
+    }
+    result = patchNative(install.path, { dryRun });
+  } else {
+    console.error(`Unsupported installation type: ${install.type}`);
+    process.exit(1);
+  }
+
+  if (result.success) {
+    console.log(result.message);
+    if (!dryRun) {
+      console.log('\nRestart Claude Code for the patch to take effect.');
+      console.log('AGENTS.md files will now be loaded alongside CLAUDE.md.');
+    }
+  } else {
+    console.error(result.message);
+    process.exit(1);
+  }
+}
+
+function unpatch() {
+  const install = detectInstallation();
+
+  if (!install.type) {
+    console.error('Could not find Claude Code installation.');
+    process.exit(1);
+  }
+
+  console.log(`Detected: ${install.type} installation`);
+  console.log(`Path:     ${install.path}\n`);
+
+  let result;
+  if (install.type === 'npm') {
+    result = unpatchNpm(install.path);
+  } else if (install.type === 'native') {
+    result = unpatchNative(install.path);
+  } else {
+    console.error(`Unsupported installation type: ${install.type}`);
+    process.exit(1);
+  }
+
+  if (result.success) {
+    console.log(result.message);
+  } else {
+    console.error(result.message);
+    process.exit(1);
+  }
+}
+
 // CLI dispatch
 const command = process.argv[2];
-const commands = { setup, remove, status, doctor, preview };
+const commands = { setup, remove, status, doctor, preview, patch, unpatch };
 
 if (!command || command === '--help' || command === '-h') {
   console.log(`cc-agents-md — Load AGENTS.md into Claude Code sessions
 
 Usage:
-  cc-agents-md setup    Install the SessionStart hook
-  cc-agents-md remove   Uninstall completely
-  cc-agents-md status   Show installation state and detected files
-  cc-agents-md doctor   Full health check
-  cc-agents-md preview  Show what Claude would see
+  cc-agents-md setup     Install the SessionStart hook
+  cc-agents-md remove    Uninstall completely
+  cc-agents-md status    Show installation state and detected files
+  cc-agents-md doctor    Full health check
+  cc-agents-md preview   Show what Claude would see
+
+Experimental:
+  cc-agents-md patch     Patch Claude Code to load AGENTS.md natively
+  cc-agents-md unpatch   Restore Claude Code to original state
+
+Patch options:
+  --dry-run        Show what would be patched without modifying files
+  --force          Required for native binary patching (Homebrew)
 
 Options:
   --help, -h       Show this help

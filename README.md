@@ -10,7 +10,7 @@
 
 Claude Code only reads `CLAUDE.md`. The [AGENTS.md specification](https://agents.md) is supported by 23+ tools (Codex, Cursor, Copilot, Gemini CLI, and more), but Claude Code is not one of them. This has been the [most requested feature](https://github.com/anthropics/claude-code/issues/6235) (3,600+ upvotes) with no official response.
 
-**cc-agents-md** fixes this. One command, and every Claude Code session automatically loads your AGENTS.md files. No CLAUDE.md wrapper files. No symlinks. No patches.
+**cc-agents-md** fixes this. One command, and every Claude Code session automatically loads your AGENTS.md files. No CLAUDE.md wrapper files. No symlinks.
 
 ## How It Works
 
@@ -19,7 +19,7 @@ A `SessionStart` hook is registered in `~/.claude/settings.json`. On every new C
 1. Walks **upward** from your working directory to the git root
 2. Collects every `AGENTS.md` on the path
 3. Small files are **inlined** directly into Claude's context
-4. Large files get a **preview + read instruction** — Claude reads the full file on demand
+4. Large files get a **read instruction** — Claude reads the full file on demand
 
 ```text
 monorepo/
@@ -64,6 +64,46 @@ npx cc-agents-md remove
 | `status`  | Show installation state and detected AGENTS.md    |
 | `doctor`  | Full health check                                 |
 | `preview` | Print exactly what Claude would see               |
+| `patch`   | **Experimental** — patch Claude Code internals    |
+| `unpatch` | Restore Claude Code to original state             |
+
+## Experimental: Internal Patching
+
+> **Warning**: This is experimental. It modifies Claude Code's JavaScript internals and may break after updates. Use `cc-agents-md unpatch` to restore at any time.
+
+The default `setup` command uses a stable SessionStart hook. For deeper integration, `patch` modifies Claude Code itself so it loads AGENTS.md natively — the same way it loads CLAUDE.md:
+
+```bash
+# Dry run — see what would change
+cc-agents-md patch --dry-run
+
+# Patch npm installation
+cc-agents-md patch
+
+# Patch native binary (Homebrew) — requires --force
+cc-agents-md patch --force
+
+# Restore original
+cc-agents-md unpatch
+```
+
+### What it does
+
+Patches the async reader function inside Claude Code to try `AGENTS.md` as a fallback when `CLAUDE.md` is not found. This means:
+
+- `AGENTS.md` is loaded at each directory level (same walk-up discovery as CLAUDE.md)
+- `AGENTS.local.md` works as a local counterpart (like CLAUDE.local.md)
+- `.claude/AGENTS.md` is checked alongside `.claude/CLAUDE.md`
+
+### After Claude Code updates
+
+The patch needs to be reapplied after every Claude Code update:
+
+```bash
+cc-agents-md patch        # or: cc-agents-md patch --force
+```
+
+The backup of the previous version is stored alongside the patched file and used by `unpatch` to restore.
 
 ## Configuration
 
@@ -87,7 +127,7 @@ Still creates a CLAUDE.md file (even if it's a symlink). Doesn't handle nested A
 
 ### `tweakcc`
 
-Patches Claude Code's JavaScript internals. Breaks on every update. This tool uses the stable, documented hook API.
+A general-purpose Claude Code patcher with 40+ patches (themes, prompts, tools, etc.). cc-agents-md is focused solely on AGENTS.md loading — the `setup` command uses the stable hook API (no patching), while `patch` is an opt-in experimental alternative for deeper integration.
 
 ## Requirements
 
