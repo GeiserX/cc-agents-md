@@ -50,7 +50,7 @@ The Homebrew binary is a Bun standalone (~190MB Mach-O arm64). Key structure:
 - Binary is ad-hoc codesigned; must re-sign after any modification
 
 ### __BUN section content layout
-```
+```text
 [8-byte header: u64 content_size]
 [module header: bytes 0-423]
   - source_size stored at content offsets 164 AND 420 (both must match)
