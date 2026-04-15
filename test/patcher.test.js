@@ -68,8 +68,8 @@ describe('patcher.js', () => {
     const { patched, matchCount } = patchSource(MOCK_SOURCE);
     assert.strictEqual(matchCount, 1);
     assert.ok(patched.includes(PATCH_SENTINEL));
-    assert.ok(patched.includes('AGENTS.md'));
-    assert.ok(patched.includes('_ccamd_didReroute'));
+    assert.ok(patched.includes('"AGENTS$1.md"'));
+    assert.ok(patched.includes('if(!_r)'));
   });
 
   it('patchSource patches multiple functions', () => {
@@ -94,29 +94,20 @@ describe('patcher.js', () => {
     assert.strictEqual(matchCount, 0);
   });
 
-  it('patched code has AGENTS.md fallback for CLAUDE.md', () => {
+  it('patched code has CLAUDE→AGENTS regex replacement', () => {
     const { patched } = patchSource(MOCK_SOURCE);
-    assert.ok(patched.includes('endsWith("/CLAUDE.md")'));
-    assert.ok(patched.includes('"AGENTS.md"'));
+    // Single regex handles CLAUDE.md, CLAUDE.local.md, .claude/CLAUDE.md
+    assert.ok(patched.includes('CLAUDE'));
+    assert.ok(patched.includes('"AGENTS$1.md"'));
+    assert.ok(patched.includes('.replace('));
   });
 
-  it('patched code has AGENTS.local.md fallback for CLAUDE.local.md', () => {
+  it('patched code prevents infinite recursion via guard flag', () => {
     const { patched } = patchSource(MOCK_SOURCE);
-    assert.ok(patched.includes('endsWith("/CLAUDE.local.md")'));
-    assert.ok(patched.includes('"AGENTS.local.md"'));
-  });
-
-  it('patched code has .claude/AGENTS.md fallback', () => {
-    const { patched } = patchSource(MOCK_SOURCE);
-    assert.ok(patched.includes('/.claude/AGENTS.md'));
-  });
-
-  it('patched code prevents infinite recursion via didReroute flag', () => {
-    const { patched } = patchSource(MOCK_SOURCE);
-    // The recursive call passes true as the didReroute parameter
-    assert.ok(patched.includes(',true)'));
-    // The guard checks !_ccamd_didReroute
-    assert.ok(patched.includes('if(!_ccamd_didReroute)'));
+    // Recursive call passes 1 as the guard parameter
+    assert.ok(patched.includes(',1)'));
+    // Guard checks !_r
+    assert.ok(patched.includes('if(!_r)'));
   });
 
   // --- unpatchSource ---
@@ -145,7 +136,7 @@ describe('patcher.js', () => {
 
     const content = readFileSync(cliJs, 'utf8');
     assert.ok(content.includes(PATCH_SENTINEL));
-    assert.ok(content.includes('AGENTS.md'));
+    assert.ok(content.includes('"AGENTS$1.md"'));
 
     // Backup was created
     assert.ok(readFileSync(backupPath(cliJs), 'utf8') === MOCK_SOURCE);
