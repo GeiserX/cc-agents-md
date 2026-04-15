@@ -69,11 +69,10 @@ npx cc-agents-md remove
 
 ### Inline threshold
 
-Files under 200 lines are inlined fully. Larger files get a 50-line preview + a read instruction for Claude to load the rest. Customize both:
+Files under 200 lines are inlined fully. Larger files get a read instruction — Claude reads the full file on demand. Customize:
 
 ```bash
-export AGENTS_MD_INLINE_THRESHOLD=200   # lines — inline below, preview above
-export AGENTS_MD_PREVIEW_LINES=50       # lines shown in the preview
+export AGENTS_MD_INLINE_THRESHOLD=200   # lines — inline below, read instruction above
 ```
 
 ## How is this different from...

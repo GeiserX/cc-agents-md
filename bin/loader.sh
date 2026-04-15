@@ -5,7 +5,6 @@
 # All errors silenced — never block a session.
 
 INLINE_THRESHOLD="${AGENTS_MD_INLINE_THRESHOLD:-200}"
-PREVIEW_LINES="${AGENTS_MD_PREVIEW_LINES:-50}"
 PROJECT="${CLAUDE_PROJECT_DIR:-.}"
 
 # Resolve to absolute path
@@ -50,12 +49,9 @@ for f in "${reversed[@]}"; do
     cat "$f" 2>/dev/null
     echo ""
   else
-    # Large file — preview + read instruction
-    echo "# AGENTS.md — ${rel} (${lines} lines — preview below, read full file for complete instructions)"
-    echo ""
-    head -n "$PREVIEW_LINES" "$f" 2>/dev/null
-    echo ""
-    echo "# [${rel}: ${lines} lines total — Read full file: ${f}]"
+    # Large file — read instruction only
+    echo "# AGENTS.md — ${rel} (${lines} lines)"
+    echo "# Read the full file for project instructions: ${f}"
     echo ""
   fi
 done
