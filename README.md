@@ -18,7 +18,8 @@ A `SessionStart` hook is registered in `~/.claude/settings.json`. On every new C
 
 1. Walks **upward** from your working directory to the git root
 2. Collects every `AGENTS.md` on the path
-3. Outputs them root-first into Claude's context
+3. Small files are **inlined** directly into Claude's context
+4. Large files get a **preview + read instruction** — Claude reads the full file on demand
 
 ```text
 monorepo/
@@ -66,12 +67,13 @@ npx cc-agents-md remove
 
 ## Configuration
 
-### Line limit
+### Inline threshold
 
-By default, AGENTS.md files are loaded in full. If you need to cap the output, set:
+Files under 200 lines are inlined fully. Larger files get a 50-line preview + a read instruction for Claude to load the rest. Customize both:
 
 ```bash
-export AGENTS_MD_MAX_LINES=5000
+export AGENTS_MD_INLINE_THRESHOLD=200   # lines — inline below, preview above
+export AGENTS_MD_PREVIEW_LINES=50       # lines shown in the preview
 ```
 
 ## How is this different from...
