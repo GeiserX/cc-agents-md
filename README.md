@@ -1,11 +1,97 @@
-<p align="center">
-  <img src="docs/images/banner.svg" alt="agents-md-loader banner" width="900"/>
-</p>
-
 # agents-md-loader
 
-Load AGENTS.md into Claude Code sessions — no CLAUDE.md needed.
+> Load AGENTS.md into Claude Code sessions — no CLAUDE.md needed.
+
+[![CI](https://github.com/GeiserX/agents-md-loader/actions/workflows/ci.yml/badge.svg)](https://github.com/GeiserX/agents-md-loader/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/agents-md-loader)](https://www.npmjs.com/package/agents-md-loader)
+[![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+
+Claude Code only reads `CLAUDE.md`. The [AGENTS.md specification](https://agents.md) is supported by 23+ tools (Codex, Cursor, Copilot, Gemini CLI, and more), but Claude Code is not one of them. This has been the [most requested feature](https://github.com/anthropics/claude-code/issues/6235) (3,600+ upvotes) with no official response.
+
+**agents-md-loader** fixes this. One command, and every Claude Code session automatically loads your AGENTS.md files. No CLAUDE.md wrapper files. No symlinks. No patches.
+
+## How It Works
+
+A `SessionStart` hook is registered in `~/.claude/settings.json`. On every new Claude Code session, the hook:
+
+1. Walks **upward** from your working directory to the git root
+2. Collects every `AGENTS.md` on the path
+3. Outputs them root-first into Claude's context
+
+```text
+monorepo/
+├── AGENTS.md                  ← always loaded (project root)
+├── packages/
+│   ├── frontend/
+│   │   ├── AGENTS.md          ← loaded if you're working here
+│   │   └── src/
+│   └── backend/
+│       ├── AGENTS.md          ← NOT loaded (not on your path)
+│       └── src/
+```
+
+The depth adapts to where you are. Open Claude at the root? One file. Open it in `packages/frontend`? Two files. No scanning downward, no wasted context.
+
+## Installation
+
+```bash
+npx agents-md-loader setup
+```
+
+That's it. Restart Claude Code.
+
+### Verify
+
+```bash
+npx agents-md-loader doctor
+```
+
+### Uninstall
+
+```bash
+npx agents-md-loader remove
+```
+
+## Commands
+
+| Command   | Description                                      |
+|-----------|--------------------------------------------------|
+| `setup`   | Install the SessionStart hook globally            |
+| `remove`  | Uninstall completely (hook + script)              |
+| `status`  | Show installation state and detected AGENTS.md    |
+| `doctor`  | Full health check                                 |
+| `preview` | Print exactly what Claude would see               |
+
+## Configuration
+
+### Line limit
+
+By default, output is capped at 5,000 lines to avoid flooding Claude's context. Override via environment variable:
+
+```bash
+export AGENTS_MD_MAX_LINES=10000
+```
+
+## How is this different from...
+
+### `@AGENTS.md` in CLAUDE.md
+
+That still requires a CLAUDE.md file in every repo. Also, [imported content is followed less reliably](https://github.com/anthropics/claude-code/issues/35295) than inline instructions.
+
+### Symlink `CLAUDE.md → AGENTS.md`
+
+Still creates a CLAUDE.md file (even if it's a symlink). Doesn't handle nested AGENTS.md in monorepos.
+
+### `tweakcc`
+
+Patches Claude Code's JavaScript internals. Breaks on every update. This tool uses the stable, documented hook API.
+
+## Requirements
+
+- Claude Code (any version with SessionStart hooks)
+- Node.js >= 18 (for the CLI only — the runtime hook is pure bash)
+- bash (pre-installed on macOS and Linux)
 
 ## License
 
-GPL-3.0
+GPL-3.0 — see [LICENSE](LICENSE).
