@@ -1,10 +1,12 @@
-# cc-agents-md
+<p align="center">
+  <img src="docs/images/banner.svg" alt="cc-agents-md banner" width="900"/>
+</p>
 
-> Load AGENTS.md into Claude Code sessions — no CLAUDE.md needed.
-
-[![CI](https://github.com/GeiserX/cc-agents-md/actions/workflows/ci.yml/badge.svg)](https://github.com/GeiserX/cc-agents-md/actions/workflows/ci.yml)
-[![npm version](https://img.shields.io/npm/v/cc-agents-md)](https://www.npmjs.com/package/cc-agents-md)
-[![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
+<p align="center">
+  <a href="https://github.com/GeiserX/cc-agents-md/actions/workflows/ci.yml"><img src="https://github.com/GeiserX/cc-agents-md/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://www.npmjs.com/package/cc-agents-md"><img src="https://img.shields.io/npm/v/cc-agents-md" alt="npm version"></a>
+  <a href="https://www.gnu.org/licenses/gpl-3.0"><img src="https://img.shields.io/badge/License-GPL--3.0-blue.svg" alt="License: GPL-3.0"></a>
+</p>
 
 Claude Code only reads `CLAUDE.md`. The [AGENTS.md specification](https://agents.md) is supported by 23+ tools (Codex, Cursor, Copilot, Gemini CLI, and more), but Claude Code is not one of them. This has been the [most requested feature](https://github.com/anthropics/claude-code/issues/6235) (3,600+ upvotes) with no official response.
 
