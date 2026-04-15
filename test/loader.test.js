@@ -85,22 +85,20 @@ describe('loader.sh', () => {
     writeFileSync(join(tmpDir, 'AGENTS.md'), content);
 
     const output = runLoader(tmpDir);
-    assert.ok(!output.includes('Read full file'), 'Small file should NOT have read instruction');
+    assert.ok(!output.includes('Read the full file'), 'Small file should NOT have read instruction');
     assert.strictEqual(output.split('line of content').length - 1, 50, 'All 50 lines should be present');
   });
 
-  it('shows preview + read instruction for large files', () => {
+  it('shows read instruction for large files', () => {
     const content = Array(500).fill('line of content').join('\n') + '\n';
     writeFileSync(join(tmpDir, 'AGENTS.md'), content);
 
     const output = runLoader(tmpDir);
     assert.ok(output.includes('lines'), 'Should show line count');
-    assert.ok(output.includes('Read full file:'), 'Should have read instruction');
+    assert.ok(output.includes('Read the full file'), 'Should have read instruction');
     assert.ok(output.includes(join(tmpDir, 'AGENTS.md')), 'Should include absolute path');
-    // Should have preview lines but NOT all 500
-    const contentLines = output.split('line of content').length - 1;
-    assert.ok(contentLines >= 50, 'Should have at least preview lines');
-    assert.ok(contentLines < 500, 'Should NOT have all lines');
+    // Should NOT contain the actual file content
+    assert.ok(!output.includes('line of content'), 'Should NOT inline content');
   });
 
   it('respects AGENTS_MD_INLINE_THRESHOLD', () => {
@@ -109,21 +107,21 @@ describe('loader.sh', () => {
 
     // Default threshold is 200, so 100 lines should inline
     const inlined = runLoader(tmpDir);
-    assert.ok(!inlined.includes('Read full file'), 'Should inline under default threshold');
+    assert.ok(!inlined.includes('Read the full file'), 'Should inline under default threshold');
 
     // Set threshold to 50, so 100 lines should trigger preview
     const previewed = runLoader(tmpDir, { AGENTS_MD_INLINE_THRESHOLD: '50' });
-    assert.ok(previewed.includes('Read full file'), 'Should preview when over custom threshold');
+    assert.ok(previewed.includes('Read the full file'), 'Should preview when over custom threshold');
   });
 
-  it('respects AGENTS_MD_PREVIEW_LINES', () => {
+  it('read instruction includes absolute path for large files', () => {
     const lines = Array.from({ length: 500 }, (_, i) => `line-${i + 1}`);
-    writeFileSync(join(tmpDir, 'AGENTS.md'), lines.join('\n'));
+    writeFileSync(join(tmpDir, 'AGENTS.md'), lines.join('\n') + '\n');
 
-    const output = runLoader(tmpDir, { AGENTS_MD_PREVIEW_LINES: '10' });
-    assert.ok(output.includes('line-10'), 'Should include line 10');
-    assert.ok(!output.includes('line-11'), 'Should NOT include line 11');
-    assert.ok(output.includes('Read full file'), 'Should have read instruction');
+    const output = runLoader(tmpDir);
+    assert.ok(output.includes('Read the full file'), 'Should have read instruction');
+    assert.ok(output.includes(tmpDir), 'Should include absolute path');
+    assert.ok(!output.includes('line-1'), 'Should NOT include file content');
   });
 
   it('works without a git repo', () => {
@@ -154,7 +152,7 @@ describe('loader.sh', () => {
     // Root should be inlined
     assert.ok(output.includes('Small root file.'), 'Small root should be inlined');
     // Nested should have read instruction
-    assert.ok(output.includes('Read full file:'), 'Large nested should have read instruction');
+    assert.ok(output.includes('Read the full file'), 'Large nested should have read instruction');
     assert.ok(output.includes('lines'), 'Should show line count for large file');
   });
 });
