@@ -18,7 +18,7 @@ A `SessionStart` hook is registered in `~/.claude/settings.json`. On every new C
 
 1. Walks **upward** from your working directory to the git root
 2. Collects every `AGENTS.md` on the path
-3. Outputs them root-first into Claude's context
+3. Writes them root-first into `.claude/CLAUDE.md` — auto-loaded by Claude Code with no size limit
 
 ```text
 monorepo/
@@ -33,6 +33,12 @@ monorepo/
 ```
 
 The depth adapts to where you are. Open Claude at the root? One file. Open it in `packages/frontend`? Two files. No scanning downward, no wasted context.
+
+The generated `.claude/CLAUDE.md` is auto-managed — it's overwritten on every session start and cleaned up when no AGENTS.md files exist. Add it to your `.gitignore`:
+
+```
+.claude/CLAUDE.md
+```
 
 ## Installation
 
