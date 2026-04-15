@@ -149,14 +149,28 @@ function preview() {
   }
 
   try {
+    // Run the loader (writes .claude/CLAUDE.md)
     const output = execSync(`bash "${HOOK_SCRIPT}"`, {
       encoding: 'utf8',
       env: { ...process.env, CLAUDE_PROJECT_DIR: process.cwd() }
     });
-    if (output.trim()) {
+
+    // Show the generated file content
+    const cwd = process.cwd();
+    let root;
+    try {
+      root = execSync('git rev-parse --show-toplevel', { cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+    } catch {
+      root = cwd;
+    }
+
+    const generated = join(root, '.claude', 'CLAUDE.md');
+    if (existsSync(generated)) {
+      process.stdout.write(readFileSync(generated, 'utf8'));
+    } else if (output.trim()) {
       process.stdout.write(output);
     } else {
-      console.log('No AGENTS.md files found — nothing would be injected.');
+      console.log('No AGENTS.md files found — nothing would be generated.');
     }
   } catch (err) {
     console.error(`Error running loader: ${err.message}`);
