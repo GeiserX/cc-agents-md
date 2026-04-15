@@ -3,7 +3,6 @@
 # Walks from $CLAUDE_PROJECT_DIR up to git root, outputs root-first.
 # All errors silenced — never block a session.
 
-MAX_LINES="${AGENTS_MD_MAX_LINES:-5000}"
 PROJECT="${CLAUDE_PROJECT_DIR:-.}"
 
 # Resolve to absolute path
@@ -32,25 +31,27 @@ for (( i=${#files[@]}-1; i>=0; i-- )); do
   reversed+=("${files[$i]}")
 done
 
-# Output with headers
+# Output with headers (truncation opt-in via AGENTS_MD_MAX_LINES)
 total_lines=0
 for f in "${reversed[@]}"; do
   prefix="$ROOT/"
   rel="${f#$prefix}"
   [ "$rel" = "$f" ] && rel="$(basename "$f")"
 
-  lines=$(wc -l < "$f" 2>/dev/null || echo 0)
-  lines="${lines##* }"
-  total_lines=$((total_lines + lines))
+  if [ -n "$AGENTS_MD_MAX_LINES" ]; then
+    lines=$(wc -l < "$f" 2>/dev/null || echo 0)
+    lines="${lines##* }"
+    total_lines=$((total_lines + lines))
 
-  if [ "$total_lines" -gt "$MAX_LINES" ]; then
-    echo "# AGENTS.md — ${rel} [TRUNCATED — exceeded ${MAX_LINES} line limit]"
-    echo ""
-    remaining=$((MAX_LINES - (total_lines - lines)))
-    [ "$remaining" -gt 0 ] && head -n "$remaining" "$f" 2>/dev/null
-    echo ""
-    echo "# [Remaining AGENTS.md files skipped due to size limit]"
-    break
+    if [ "$total_lines" -gt "$AGENTS_MD_MAX_LINES" ]; then
+      echo "# AGENTS.md — ${rel} [TRUNCATED — exceeded ${AGENTS_MD_MAX_LINES} line limit]"
+      echo ""
+      remaining=$((AGENTS_MD_MAX_LINES - (total_lines - lines)))
+      [ "$remaining" -gt 0 ] && head -n "$remaining" "$f" 2>/dev/null
+      echo ""
+      echo "# [Remaining AGENTS.md files skipped due to size limit]"
+      break
+    fi
   fi
 
   echo "# AGENTS.md — ${rel}"
