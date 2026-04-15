@@ -68,10 +68,10 @@ npx cc-agents-md remove
 
 ### Line limit
 
-By default, output is capped at 5,000 lines to avoid flooding Claude's context. Override via environment variable:
+By default, AGENTS.md files are loaded in full. If you need to cap the output, set:
 
 ```bash
-export AGENTS_MD_MAX_LINES=10000
+export AGENTS_MD_MAX_LINES=5000
 ```
 
 ## How is this different from...

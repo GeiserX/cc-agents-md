@@ -80,7 +80,16 @@ describe('loader.sh', () => {
     assert.ok(!output.includes('Backend rules'), 'Sibling AGENTS.md must NOT be loaded');
   });
 
-  it('respects AGENTS_MD_MAX_LINES', () => {
+  it('loads full content by default without truncation', () => {
+    const bigContent = Array(100).fill('line of content').join('\n');
+    writeFileSync(join(tmpDir, 'AGENTS.md'), bigContent);
+
+    const output = runLoader(tmpDir);
+    assert.ok(!output.includes('TRUNCATED'), 'Should NOT truncate by default');
+    assert.strictEqual(output.split('line of content').length - 1, 100, 'All 100 lines should be present');
+  });
+
+  it('truncates when AGENTS_MD_MAX_LINES is set', () => {
     const bigContent = Array(100).fill('line of content').join('\n');
     writeFileSync(join(tmpDir, 'AGENTS.md'), bigContent);
 
