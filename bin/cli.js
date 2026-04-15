@@ -6,8 +6,8 @@ const { join, dirname } = require('path');
 const { execSync, execFileSync } = require('child_process');
 const { mkdirSync } = require('fs');
 const { readSettings, writeSettings, isInstalled, addHook, removeHook } = require('../lib/settings');
-const { detectInstallation } = require('../lib/detect');
-const { patchNpm, unpatchNpm, isPatched: isPatchedSource } = require('../lib/patcher');
+const { detectInstallation, detectNpm, detectNative } = require('../lib/detect');
+const { patchNpm, unpatchNpm, isPatched: isPatchedSource, backupPath } = require('../lib/patcher');
 const { patchNative, unpatchNative } = require('../lib/patch-native');
 
 const HOME = process.env.HOME || process.env.USERPROFILE;
@@ -185,19 +185,63 @@ function preview() {
   }
 }
 
+/**
+ * Parse --path <value> from argv.
+ */
+function parsePathArg() {
+  const idx = process.argv.indexOf('--path');
+  if (idx === -1 || idx + 1 >= process.argv.length) return null;
+  return process.argv[idx + 1];
+}
+
+/**
+ * Resolve the target installation. Supports --path override.
+ * When no --path given, prefers an install that already has a backup
+ * (i.e. was previously patched) before falling back to auto-detect.
+ */
+function resolveInstallation(pathOverride) {
+  if (pathOverride) {
+    if (!existsSync(pathOverride)) {
+      console.error(`Specified path not found: ${pathOverride}`);
+      process.exit(1);
+    }
+    // Detect type from file header
+    const fd = require('fs').openSync(pathOverride, 'r');
+    const buf = Buffer.alloc(4);
+    require('fs').readSync(fd, buf, 0, 4, 0);
+    require('fs').closeSync(fd);
+    const isMachO = buf[0] === 0xCF && buf[1] === 0xFA && buf[2] === 0xED && buf[3] === 0xFE;
+    const isELF = buf[0] === 0x7F && buf[1] === 0x45 && buf[2] === 0x4C && buf[3] === 0x46;
+    const type = (isMachO || isELF) ? 'native' : 'npm';
+    return { type, path: pathOverride, version: null };
+  }
+
+  // Check both installs; prefer one that already has a backup
+  const npm = detectNpm();
+  const native = detectNative();
+
+  if (npm && existsSync(backupPath(npm.path))) return npm;
+  if (native && existsSync(backupPath(native.path))) return native;
+
+  // Fall back to auto-detect (prefers npm)
+  return detectInstallation();
+}
+
 function patch() {
   const dryRun = process.argv.includes('--dry-run');
   const force = process.argv.includes('--force');
+  const pathOverride = parsePathArg();
 
   console.log('\x1b[33m⚠  EXPERIMENTAL: This modifies Claude Code internals.\x1b[0m');
   console.log('   Patches may break after Claude Code updates.');
   console.log('   Run "cc-agents-md unpatch" to restore at any time.\n');
 
-  const install = detectInstallation();
+  const install = resolveInstallation(pathOverride);
 
-  if (!install.type) {
+  if (!install || !install.type) {
     console.error('Could not find Claude Code installation.');
     console.error('Ensure Claude Code is installed via npm or Homebrew.');
+    console.error('Or specify a path: cc-agents-md patch --path /path/to/cli.js');
     process.exit(1);
   }
 
@@ -235,10 +279,12 @@ function patch() {
 }
 
 function unpatch() {
-  const install = detectInstallation();
+  const pathOverride = parsePathArg();
+  const install = resolveInstallation(pathOverride);
 
-  if (!install.type) {
+  if (!install || !install.type) {
     console.error('Could not find Claude Code installation.');
+    console.error('Or specify a path: cc-agents-md unpatch --path /path/to/cli.js');
     process.exit(1);
   }
 
