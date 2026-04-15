@@ -1,19 +1,19 @@
 {
-  "name": "agents-md-loader",
+  "name": "cc-agents-md",
   "version": "0.1.0",
   "description": "Load AGENTS.md into Claude Code sessions — no CLAUDE.md needed",
   "license": "GPL-3.0-only",
   "author": "GeiserX",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/GeiserX/agents-md-loader.git"
+    "url": "git+https://github.com/GeiserX/cc-agents-md.git"
   },
-  "homepage": "https://github.com/GeiserX/agents-md-loader#readme",
+  "homepage": "https://github.com/GeiserX/cc-agents-md#readme",
   "bugs": {
-    "url": "https://github.com/GeiserX/agents-md-loader/issues"
+    "url": "https://github.com/GeiserX/cc-agents-md/issues"
   },
   "bin": {
-    "agents-md-loader": "./bin/cli.js"
+    "cc-agents-md": "./bin/cli.js"
   },
   "files": [
     "bin/",

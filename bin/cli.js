@@ -9,7 +9,7 @@ const { readSettings, writeSettings, isInstalled, addHook, removeHook } = requir
 
 const CLAUDE_DIR = join(process.env.HOME, '.claude');
 const HOOK_DIR = join(CLAUDE_DIR, 'hooks');
-const HOOK_SCRIPT = join(HOOK_DIR, 'agents-md-loader.sh');
+const HOOK_SCRIPT = join(HOOK_DIR, 'cc-agents-md.sh');
 const SETTINGS_PATH = join(CLAUDE_DIR, 'settings.json');
 const SOURCE_SCRIPT = join(__dirname, 'loader.sh');
 
@@ -44,7 +44,7 @@ function setup() {
   const scriptExists = existsSync(HOOK_SCRIPT);
 
   if (hookRegistered && scriptExists) {
-    console.log('Already installed. Run "agents-md-loader doctor" to verify.');
+    console.log('Already installed. Run "cc-agents-md doctor" to verify.');
     return;
   }
 
@@ -144,7 +144,7 @@ function doctor() {
 
 function preview() {
   if (!existsSync(HOOK_SCRIPT)) {
-    console.error('Hook script not found. Run "agents-md-loader setup" first.');
+    console.error('Hook script not found. Run "cc-agents-md setup" first.');
     process.exit(1);
   }
 
@@ -169,14 +169,14 @@ const command = process.argv[2];
 const commands = { setup, remove, status, doctor, preview };
 
 if (!command || command === '--help' || command === '-h') {
-  console.log(`agents-md-loader — Load AGENTS.md into Claude Code sessions
+  console.log(`cc-agents-md — Load AGENTS.md into Claude Code sessions
 
 Usage:
-  agents-md-loader setup    Install the SessionStart hook
-  agents-md-loader remove   Uninstall completely
-  agents-md-loader status   Show installation state and detected files
-  agents-md-loader doctor   Full health check
-  agents-md-loader preview  Show what Claude would see
+  cc-agents-md setup    Install the SessionStart hook
+  cc-agents-md remove   Uninstall completely
+  cc-agents-md status   Show installation state and detected files
+  cc-agents-md doctor   Full health check
+  cc-agents-md preview  Show what Claude would see
 
 Options:
   --help, -h       Show this help
@@ -190,7 +190,7 @@ if (command === '--version' || command === '-v') {
 }
 
 if (!commands[command]) {
-  console.error(`Unknown command: ${command}\nRun "agents-md-loader --help" for usage.`);
+  console.error(`Unknown command: ${command}\nRun "cc-agents-md --help" for usage.`);
   process.exit(1);
 }
 

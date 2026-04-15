@@ -1,14 +1,14 @@
-# agents-md-loader
+# cc-agents-md
 
 > Load AGENTS.md into Claude Code sessions — no CLAUDE.md needed.
 
-[![CI](https://github.com/GeiserX/agents-md-loader/actions/workflows/ci.yml/badge.svg)](https://github.com/GeiserX/agents-md-loader/actions/workflows/ci.yml)
-[![npm version](https://img.shields.io/npm/v/agents-md-loader)](https://www.npmjs.com/package/agents-md-loader)
+[![CI](https://github.com/GeiserX/cc-agents-md/actions/workflows/ci.yml/badge.svg)](https://github.com/GeiserX/cc-agents-md/actions/workflows/ci.yml)
+[![npm version](https://img.shields.io/npm/v/cc-agents-md)](https://www.npmjs.com/package/cc-agents-md)
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](https://www.gnu.org/licenses/gpl-3.0)
 
 Claude Code only reads `CLAUDE.md`. The [AGENTS.md specification](https://agents.md) is supported by 23+ tools (Codex, Cursor, Copilot, Gemini CLI, and more), but Claude Code is not one of them. This has been the [most requested feature](https://github.com/anthropics/claude-code/issues/6235) (3,600+ upvotes) with no official response.
 
-**agents-md-loader** fixes this. One command, and every Claude Code session automatically loads your AGENTS.md files. No CLAUDE.md wrapper files. No symlinks. No patches.
+**cc-agents-md** fixes this. One command, and every Claude Code session automatically loads your AGENTS.md files. No CLAUDE.md wrapper files. No symlinks. No patches.
 
 ## How It Works
 
@@ -35,7 +35,7 @@ The depth adapts to where you are. Open Claude at the root? One file. Open it in
 ## Installation
 
 ```bash
-npx agents-md-loader setup
+npx cc-agents-md setup
 ```
 
 That's it. Restart Claude Code.
@@ -43,13 +43,13 @@ That's it. Restart Claude Code.
 ### Verify
 
 ```bash
-npx agents-md-loader doctor
+npx cc-agents-md doctor
 ```
 
 ### Uninstall
 
 ```bash
-npx agents-md-loader remove
+npx cc-agents-md remove
 ```
 
 ## Commands

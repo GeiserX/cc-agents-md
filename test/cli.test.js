@@ -39,7 +39,7 @@ describe('CLI', () => {
 
   it('shows help with --help', () => {
     const { stdout } = runCli('--help');
-    assert.ok(stdout.includes('agents-md-loader'));
+    assert.ok(stdout.includes('cc-agents-md'));
     assert.ok(stdout.includes('setup'));
     assert.ok(stdout.includes('remove'));
     assert.ok(stdout.includes('doctor'));
@@ -64,9 +64,9 @@ describe('CLI', () => {
 
     const settings = JSON.parse(readFileSync(settingsPath, 'utf8'));
     assert.ok(settings.hooks?.SessionStart?.length > 0);
-    assert.ok(settings.hooks.SessionStart[0].hooks[0].command.includes('agents-md-loader'));
+    assert.ok(settings.hooks.SessionStart[0].hooks[0].command.includes('cc-agents-md'));
 
-    assert.ok(existsSync(join(fakeHome, '.claude', 'hooks', 'agents-md-loader.sh')));
+    assert.ok(existsSync(join(fakeHome, '.claude', 'hooks', 'cc-agents-md.sh')));
 
     rmSync(fakeHome, { recursive: true, force: true });
   });
@@ -119,13 +119,13 @@ describe('CLI', () => {
 
     const settings = JSON.parse(readFileSync(settingsPath, 'utf8'));
     assert.ok(!settings.hooks, 'hooks key should be removed when empty');
-    assert.ok(!existsSync(join(fakeHome, '.claude', 'hooks', 'agents-md-loader.sh')));
+    assert.ok(!existsSync(join(fakeHome, '.claude', 'hooks', 'cc-agents-md.sh')));
 
     rmSync(fakeHome, { recursive: true, force: true });
   });
 
   it('remove preserves other hooks', () => {
-    const hookScript = join(fakeHome, '.claude', 'hooks', 'agents-md-loader.sh');
+    const hookScript = join(fakeHome, '.claude', 'hooks', 'cc-agents-md.sh');
     writeFileSync(settingsPath, JSON.stringify({
       hooks: {
         SessionStart: [

@@ -6,7 +6,7 @@
 
 Instead, please use GitHub's private vulnerability reporting:
 
-1. Go to https://github.com/GeiserX/agents-md-loader/security/advisories
+1. Go to https://github.com/GeiserX/cc-agents-md/security/advisories
 2. Click "Report a vulnerability"
 3. Fill out the form with details
 

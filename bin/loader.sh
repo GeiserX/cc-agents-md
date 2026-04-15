@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# agents-md-loader: Loads AGENTS.md files for Claude Code SessionStart hook.
+# cc-agents-md: Loads AGENTS.md files for Claude Code SessionStart hook.
 # Walks from $CLAUDE_PROJECT_DIR up to git root, outputs root-first.
 # All errors silenced — never block a session.
 

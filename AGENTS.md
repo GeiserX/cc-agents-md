@@ -1,4 +1,4 @@
-# AGENTS.md — agents-md-loader
+# AGENTS.md — cc-agents-md
 
 ## Project Overview
 
