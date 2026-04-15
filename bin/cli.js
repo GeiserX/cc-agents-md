@@ -20,9 +20,13 @@ if (!HOME) {
 
 const CLAUDE_DIR = join(HOME, '.claude');
 const HOOK_DIR = join(CLAUDE_DIR, 'hooks');
-const HOOK_SCRIPT = join(HOOK_DIR, 'cc-agents-md.sh');
+const HOOK_SCRIPT = process.platform === 'win32'
+  ? join(HOOK_DIR, 'cc-agents-md.ps1')
+  : join(HOOK_DIR, 'cc-agents-md.sh');
 const SETTINGS_PATH = join(CLAUDE_DIR, 'settings.json');
-const SOURCE_SCRIPT = join(__dirname, 'loader.sh');
+const SOURCE_SCRIPT = process.platform === 'win32'
+  ? join(__dirname, 'loader.ps1')
+  : join(__dirname, 'loader.sh');
 
 function findAgentsMd(from, root) {
   if (!root) {
@@ -63,11 +67,17 @@ function setup() {
   // Copy loader script (also repairs missing script)
   mkdirSync(HOOK_DIR, { recursive: true });
   copyFileSync(SOURCE_SCRIPT, HOOK_SCRIPT);
-  chmodSync(HOOK_SCRIPT, 0o755);
+  if (process.platform !== 'win32') {
+    chmodSync(HOOK_SCRIPT, 0o755);
+  }
 
   // Add hook to settings only if not already registered
   if (!hookRegistered) {
-    addHook(settings, HOOK_SCRIPT);
+    // On Windows, Claude Code needs "powershell -File <script>" as the command
+    const hookCommand = process.platform === 'win32'
+      ? `powershell -NoProfile -ExecutionPolicy Bypass -File "${HOOK_SCRIPT}"`
+      : HOOK_SCRIPT;
+    addHook(settings, hookCommand);
     writeSettings(SETTINGS_PATH, settings);
   }
 
@@ -403,7 +413,7 @@ Usage:
 Experimental:
   cc-agents-md patch     Patch Claude Code to load AGENTS.md natively
   cc-agents-md unpatch   Restore Claude Code to original state
-  cc-agents-md watch     Auto-repatch after Homebrew upgrades (macOS)
+  cc-agents-md watch     Auto-repatch after upgrades (macOS/Linux)
   cc-agents-md unwatch   Remove the auto-repatch watcher
 
 Patch options:

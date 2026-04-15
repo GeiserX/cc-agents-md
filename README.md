@@ -57,15 +57,17 @@ npx cc-agents-md remove
 
 ## Commands
 
-| Command   | Description                                      |
-|-----------|--------------------------------------------------|
-| `setup`   | Install the SessionStart hook globally            |
-| `remove`  | Uninstall completely (hook + script)              |
-| `status`  | Show installation state and detected AGENTS.md    |
-| `doctor`  | Full health check                                 |
-| `preview` | Print exactly what Claude would see               |
-| `patch`   | **Experimental** — patch Claude Code internals    |
-| `unpatch` | Restore Claude Code to original state             |
+| Command   | Description                                       |
+|-----------|---------------------------------------------------|
+| `setup`   | Install the SessionStart hook globally             |
+| `remove`  | Uninstall completely (hook + script)               |
+| `status`  | Show installation state and detected AGENTS.md     |
+| `doctor`  | Full health check (hook, patch, watcher)           |
+| `preview` | Print exactly what Claude would see                |
+| `patch`   | **Experimental** — patch Claude Code internals     |
+| `unpatch` | Restore Claude Code to original state              |
+| `watch`   | Auto-repatch after Claude Code upgrades (macOS/Linux) |
+| `unwatch` | Remove the auto-repatch watcher                    |
 
 ## Experimental: Internal Patching
 
@@ -105,6 +107,23 @@ cc-agents-md patch        # or: cc-agents-md patch --force
 
 The backup of the previous version is stored alongside the patched file and used by `unpatch` to restore.
 
+### Auto-repatch watcher
+
+Tired of repatching after every update? The `watch` command installs a platform-native file watcher that automatically reapplies the patch:
+
+```bash
+# Install the watcher
+cc-agents-md watch
+
+# Remove it
+cc-agents-md unwatch
+```
+
+- **macOS**: LaunchAgent monitoring `/opt/homebrew/Caskroom/claude-code` — fires after `brew upgrade claude-code`
+- **Linux**: systemd user path unit monitoring the npm global install directory
+
+Logs are written to `~/.claude/cc-agents-md-autopatch.log`.
+
 ## Configuration
 
 ### Inline threshold
@@ -129,11 +148,19 @@ Still creates a CLAUDE.md file (even if it's a symlink). Doesn't handle nested A
 
 A general-purpose Claude Code patcher with 40+ patches (themes, prompts, tools, etc.). cc-agents-md is focused solely on AGENTS.md loading — the `setup` command uses the stable hook API (no patching), while `patch` is an opt-in experimental alternative for deeper integration.
 
+## Platform support
+
+| Platform | Hook loader | Patching | Auto-repatch watcher |
+|----------|-------------|----------|---------------------|
+| macOS    | bash        | npm + Homebrew (Bun binary) | LaunchAgent |
+| Linux    | bash        | npm      | systemd user path unit |
+| Windows  | PowerShell  | npm      | not yet supported |
+
 ## Requirements
 
 - Claude Code (any version with SessionStart hooks)
-- Node.js >= 18 (for the CLI only — the runtime hook is pure bash)
-- bash (pre-installed on macOS and Linux)
+- Node.js >= 18 (for the CLI only — the runtime hook is pure bash / PowerShell)
+- bash (macOS/Linux) or PowerShell (Windows)
 
 ## License
 
