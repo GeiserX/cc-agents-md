@@ -35,7 +35,8 @@ done
 # Output with headers
 total_lines=0
 for f in "${reversed[@]}"; do
-  rel="${f#"$ROOT"/}"
+  prefix="$ROOT/"
+  rel="${f#$prefix}"
   [ "$rel" = "$f" ] && rel="$(basename "$f")"
 
   lines=$(wc -l < "$f" 2>/dev/null || echo 0)

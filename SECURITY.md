@@ -56,4 +56,4 @@ Only the latest version receives security updates. We recommend always running t
 
 ---
 
-*Last updated: April 2025*
+*Last updated: April 2026*

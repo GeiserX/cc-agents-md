@@ -18,7 +18,7 @@ A `SessionStart` hook is registered in `~/.claude/settings.json`. On every new C
 2. Collects every `AGENTS.md` on the path
 3. Outputs them root-first into Claude's context
 
-```
+```text
 monorepo/
 ├── AGENTS.md                  ← always loaded (project root)
 ├── packages/

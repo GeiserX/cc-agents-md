@@ -1,6 +1,6 @@
 'use strict';
 
-const { describe, it, before, after } = require('node:test');
+const { describe, it, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert');
 const { mkdtempSync, writeFileSync, mkdirSync, rmSync } = require('fs');
 const { join } = require('path');
@@ -21,17 +21,22 @@ function runLoader(projectDir, env = {}) {
   }
 }
 
+function createGitRepo() {
+  const dir = mkdtempSync(join(tmpdir(), 'agents-md-test-'));
+  execSync('git init', { cwd: dir, stdio: 'pipe' });
+  execSync('git config user.name "test"', { cwd: dir, stdio: 'pipe' });
+  execSync('git config user.email "test@test.com"', { cwd: dir, stdio: 'pipe' });
+  return dir;
+}
+
 describe('loader.sh', () => {
   let tmpDir;
 
-  before(() => {
-    tmpDir = mkdtempSync(join(tmpdir(), 'agents-md-test-'));
-    execSync('git init', { cwd: tmpDir, stdio: 'pipe' });
-    execSync('git config user.name "test"', { cwd: tmpDir, stdio: 'pipe' });
-    execSync('git config user.email "test@test.com"', { cwd: tmpDir, stdio: 'pipe' });
+  beforeEach(() => {
+    tmpDir = createGitRepo();
   });
 
-  after(() => {
+  afterEach(() => {
     rmSync(tmpDir, { recursive: true, force: true });
   });
 
@@ -49,6 +54,7 @@ describe('loader.sh', () => {
   });
 
   it('loads nested AGENTS.md files root-first', () => {
+    writeFileSync(join(tmpDir, 'AGENTS.md'), '# Root instructions');
     const subDir = join(tmpDir, 'packages', 'frontend');
     mkdirSync(subDir, { recursive: true });
     writeFileSync(join(subDir, 'AGENTS.md'), '# Frontend rules');
@@ -62,11 +68,14 @@ describe('loader.sh', () => {
   });
 
   it('does not load sibling directory AGENTS.md', () => {
+    writeFileSync(join(tmpDir, 'AGENTS.md'), '# Root instructions');
+    const frontendDir = join(tmpDir, 'packages', 'frontend');
+    mkdirSync(frontendDir, { recursive: true });
+    writeFileSync(join(frontendDir, 'AGENTS.md'), '# Frontend rules');
     const backendDir = join(tmpDir, 'packages', 'backend');
     mkdirSync(backendDir, { recursive: true });
     writeFileSync(join(backendDir, 'AGENTS.md'), '# Backend rules');
 
-    const frontendDir = join(tmpDir, 'packages', 'frontend');
     const output = runLoader(frontendDir);
     assert.ok(!output.includes('Backend rules'), 'Sibling AGENTS.md must NOT be loaded');
   });

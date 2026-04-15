@@ -40,20 +40,24 @@ function findAgentsMd(from, root) {
 
 function setup() {
   const settings = readSettings(SETTINGS_PATH);
+  const hookRegistered = isInstalled(settings, HOOK_SCRIPT);
+  const scriptExists = existsSync(HOOK_SCRIPT);
 
-  if (isInstalled(settings)) {
+  if (hookRegistered && scriptExists) {
     console.log('Already installed. Run "agents-md-loader doctor" to verify.');
     return;
   }
 
-  // Copy loader script
+  // Copy loader script (also repairs missing script)
   mkdirSync(HOOK_DIR, { recursive: true });
   copyFileSync(SOURCE_SCRIPT, HOOK_SCRIPT);
   chmodSync(HOOK_SCRIPT, 0o755);
 
-  // Add hook to settings
-  addHook(settings, HOOK_SCRIPT);
-  writeSettings(SETTINGS_PATH, settings);
+  // Add hook to settings only if not already registered
+  if (!hookRegistered) {
+    addHook(settings, HOOK_SCRIPT);
+    writeSettings(SETTINGS_PATH, settings);
+  }
 
   console.log('Installed successfully.');
   console.log(`  Hook script: ${HOOK_SCRIPT}`);
@@ -63,7 +67,7 @@ function setup() {
 
 function remove() {
   const settings = readSettings(SETTINGS_PATH);
-  removeHook(settings);
+  removeHook(settings, HOOK_SCRIPT);
   writeSettings(SETTINGS_PATH, settings);
 
   try { unlinkSync(HOOK_SCRIPT); } catch {}
@@ -112,7 +116,7 @@ function doctor() {
   }
 
   const settings = readSettings(SETTINGS_PATH);
-  check('Hook registered in settings.json', isInstalled(settings));
+  check('Hook registered in settings.json', isInstalled(settings, HOOK_SCRIPT));
   check('Hook script exists', existsSync(HOOK_SCRIPT), HOOK_SCRIPT);
 
   if (existsSync(HOOK_SCRIPT)) {

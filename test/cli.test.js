@@ -125,11 +125,12 @@ describe('CLI', () => {
   });
 
   it('remove preserves other hooks', () => {
+    const hookScript = join(fakeHome, '.claude', 'hooks', 'agents-md-loader.sh');
     writeFileSync(settingsPath, JSON.stringify({
       hooks: {
         SessionStart: [
           { matcher: 'startup', hooks: [{ type: 'command', command: 'echo other' }] },
-          { matcher: '', hooks: [{ type: 'command', command: '/path/agents-md-loader.sh' }] }
+          { matcher: '', hooks: [{ type: 'command', command: hookScript }] }
         ],
         PreToolUse: [{ matcher: '', hooks: [{ type: 'command', command: 'echo pre' }] }]
       }

@@ -13,12 +13,11 @@ describe('settings.js', () => {
     assert.deepStrictEqual(result, {});
   });
 
-  it('readSettings returns empty object for invalid JSON', () => {
+  it('readSettings throws on invalid JSON (not ENOENT)', () => {
     const dir = mkdtempSync(join(tmpdir(), 'settings-test-'));
     const path = join(dir, 'settings.json');
     require('fs').writeFileSync(path, 'not json');
-    const result = readSettings(path);
-    assert.deepStrictEqual(result, {});
+    assert.throws(() => readSettings(path), /Failed to read/);
     rmSync(dir, { recursive: true, force: true });
   });
 
@@ -63,13 +62,23 @@ describe('settings.js', () => {
     assert.strictEqual(isInstalled(settings), false);
   });
 
-  it('isInstalled returns true when hook is present', () => {
+  it('isInstalled returns true when hook is present (substring fallback)', () => {
     const settings = {
       hooks: {
         SessionStart: [{ matcher: '', hooks: [{ type: 'command', command: '/path/agents-md-loader.sh' }] }]
       }
     };
     assert.strictEqual(isInstalled(settings), true);
+  });
+
+  it('isInstalled with exact path matches only that path', () => {
+    const settings = {
+      hooks: {
+        SessionStart: [{ matcher: '', hooks: [{ type: 'command', command: '/home/user/.claude/hooks/agents-md-loader.sh' }] }]
+      }
+    };
+    assert.strictEqual(isInstalled(settings, '/home/user/.claude/hooks/agents-md-loader.sh'), true);
+    assert.strictEqual(isInstalled(settings, '/other/path/agents-md-loader.sh'), false);
   });
 
   it('addHook adds to empty settings', () => {
@@ -90,7 +99,22 @@ describe('settings.js', () => {
     assert.strictEqual(settings.hooks.SessionStart[0].hooks[0].command, 'echo existing');
   });
 
-  it('removeHook removes only our hook', () => {
+  it('removeHook with exact path removes only that entry', () => {
+    const hookPath = '/home/user/.claude/hooks/agents-md-loader.sh';
+    const settings = {
+      hooks: {
+        SessionStart: [
+          { matcher: '', hooks: [{ type: 'command', command: 'echo other' }] },
+          { matcher: '', hooks: [{ type: 'command', command: hookPath }] }
+        ]
+      }
+    };
+    removeHook(settings, hookPath);
+    assert.strictEqual(settings.hooks.SessionStart.length, 1);
+    assert.strictEqual(settings.hooks.SessionStart[0].hooks[0].command, 'echo other');
+  });
+
+  it('removeHook without path uses substring fallback', () => {
     const settings = {
       hooks: {
         SessionStart: [
@@ -105,12 +129,13 @@ describe('settings.js', () => {
   });
 
   it('removeHook cleans up empty hooks object', () => {
+    const hookPath = '/agents-md-loader.sh';
     const settings = {
       hooks: {
-        SessionStart: [{ matcher: '', hooks: [{ type: 'command', command: '/agents-md-loader.sh' }] }]
+        SessionStart: [{ matcher: '', hooks: [{ type: 'command', command: hookPath }] }]
       }
     };
-    removeHook(settings);
+    removeHook(settings, hookPath);
     assert.ok(!settings.hooks, 'hooks key should be removed when empty');
   });
 
