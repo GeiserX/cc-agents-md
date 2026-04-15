@@ -1,8 +1,11 @@
 #!/usr/bin/env bash
 # cc-agents-md: Loads AGENTS.md files for Claude Code SessionStart hook.
 # Walks from $CLAUDE_PROJECT_DIR up to git root, outputs root-first.
+# Small files are inlined fully; large files get a preview + read instruction.
 # All errors silenced — never block a session.
 
+INLINE_THRESHOLD="${AGENTS_MD_INLINE_THRESHOLD:-200}"
+PREVIEW_LINES="${AGENTS_MD_PREVIEW_LINES:-50}"
 PROJECT="${CLAUDE_PROJECT_DIR:-.}"
 
 # Resolve to absolute path
@@ -31,33 +34,30 @@ for (( i=${#files[@]}-1; i>=0; i-- )); do
   reversed+=("${files[$i]}")
 done
 
-# Output with headers (truncation opt-in via AGENTS_MD_MAX_LINES)
-total_lines=0
+# Output: inline small files, preview + read instruction for large ones
 for f in "${reversed[@]}"; do
   prefix="$ROOT/"
   rel="${f#$prefix}"
   [ "$rel" = "$f" ] && rel="$(basename "$f")"
 
-  if [ -n "$AGENTS_MD_MAX_LINES" ]; then
-    lines=$(wc -l < "$f" 2>/dev/null || echo 0)
-    lines="${lines##* }"
-    total_lines=$((total_lines + lines))
+  lines=$(wc -l < "$f" 2>/dev/null || echo 0)
+  lines="${lines##* }"
 
-    if [ "$total_lines" -gt "$AGENTS_MD_MAX_LINES" ]; then
-      echo "# AGENTS.md — ${rel} [TRUNCATED — exceeded ${AGENTS_MD_MAX_LINES} line limit]"
-      echo ""
-      remaining=$((AGENTS_MD_MAX_LINES - (total_lines - lines)))
-      [ "$remaining" -gt 0 ] && head -n "$remaining" "$f" 2>/dev/null
-      echo ""
-      echo "# [Remaining AGENTS.md files skipped due to size limit]"
-      break
-    fi
+  if [ "$lines" -le "$INLINE_THRESHOLD" ]; then
+    # Small file — inline fully
+    echo "# AGENTS.md — ${rel}"
+    echo ""
+    cat "$f" 2>/dev/null
+    echo ""
+  else
+    # Large file — preview + read instruction
+    echo "# AGENTS.md — ${rel} (${lines} lines — preview below, read full file for complete instructions)"
+    echo ""
+    head -n "$PREVIEW_LINES" "$f" 2>/dev/null
+    echo ""
+    echo "# [${rel}: ${lines} lines total — Read full file: ${f}]"
+    echo ""
   fi
-
-  echo "# AGENTS.md — ${rel}"
-  echo ""
-  cat "$f" 2>/dev/null
-  echo ""
 done
 
 exit 0
