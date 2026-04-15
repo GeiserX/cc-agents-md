@@ -9,7 +9,8 @@ const { readSettings, writeSettings, isInstalled, addHook, removeHook } = requir
 const { detectInstallation, detectNpm, detectNative } = require('../lib/detect');
 const { patchNpm, unpatchNpm, isPatched: isPatchedSource, backupPath } = require('../lib/patcher');
 const { patchNative, unpatchNative } = require('../lib/patch-native');
-const { patchBun, unpatchBun } = require('../lib/patch-bun');
+const { patchBun, unpatchBun, readPatchMeta } = require('../lib/patch-bun');
+const { installWatch, removeWatch, watchStatus } = require('../lib/watch');
 
 const HOME = process.env.HOME || process.env.USERPROFILE;
 if (!HOME) {
@@ -155,6 +156,42 @@ function doctor() {
   check('AGENTS.md found in project', files.length > 0,
     files.length > 0 ? `${files.length} file(s)` : 'none in current project');
 
+  // Check patch status
+  const install = detectInstallation();
+  if (install && install.type === 'native') {
+    const meta = readPatchMeta(install.path);
+    if (meta) {
+      check('Native binary patched', true,
+        `v${meta.version || '?'}, tier ${meta.regexTier}, ${meta.growth}b growth`);
+
+      // Check if binary version changed (upgrade detected)
+      try {
+        const currentVer = execSync(`"${install.path}" --version`, {
+          encoding: 'utf8', timeout: 10000, stdio: ['pipe', 'pipe', 'pipe'],
+        }).trim();
+        if (meta.version && currentVer !== meta.version) {
+          check('Patch matches current version', false,
+            `patched v${meta.version} but running v${currentVer} — run "cc-agents-md patch --force" to repatch`);
+        }
+      } catch { /* binary may not run if patch is stale */ }
+    } else {
+      const { BUN_PATCH_MARKER } = require('../lib/patch-bun');
+      try {
+        const probe = readFileSync(install.path, { encoding: null });
+        const patched = probe.includes(Buffer.from(BUN_PATCH_MARKER, 'utf8'));
+        check('Native binary patched', patched, patched ? 'no metadata file' : 'not patched');
+      } catch { /* best effort */ }
+    }
+  }
+
+  // Check watcher status
+  if (process.platform === 'darwin') {
+    const ws = watchStatus();
+    if (ws.installed) {
+      check('Auto-repatch watcher installed', true, ws.loaded ? 'loaded' : 'installed but not loaded');
+    }
+  }
+
   console.log(`\n${ok ? 'All checks passed.' : 'Issues found — see above.'}`);
   process.exit(ok ? 0 : 1);
 }
@@ -231,11 +268,14 @@ function resolveInstallation(pathOverride) {
 function patch() {
   const dryRun = process.argv.includes('--dry-run');
   const force = process.argv.includes('--force');
+  const auto = process.argv.includes('--auto');
   const pathOverride = parsePathArg();
 
-  console.log('\x1b[33m⚠  EXPERIMENTAL: This modifies Claude Code internals.\x1b[0m');
-  console.log('   Patches may break after Claude Code updates.');
-  console.log('   Run "cc-agents-md unpatch" to restore at any time.\n');
+  if (!auto) {
+    console.log('\x1b[33m⚠  EXPERIMENTAL: This modifies Claude Code internals.\x1b[0m');
+    console.log('   Patches may break after Claude Code updates.');
+    console.log('   Run "cc-agents-md unpatch" to restore at any time.\n');
+  }
 
   const install = resolveInstallation(pathOverride);
 
@@ -246,16 +286,20 @@ function patch() {
     process.exit(1);
   }
 
-  console.log(`Detected: ${install.type} installation`);
-  console.log(`Path:     ${install.path}`);
-  if (install.version) console.log(`Version:  ${install.version}`);
-  console.log();
+  const log = auto
+    ? (...args) => console.log(`[${new Date().toISOString()}]`, ...args)
+    : console.log.bind(console);
+
+  log(`Detected: ${install.type} installation`);
+  log(`Path:     ${install.path}`);
+  if (install.version) log(`Version:  ${install.version}`);
+  if (!auto) console.log();
 
   let result;
   if (install.type === 'npm') {
     result = patchNpm(install.path, { dryRun });
   } else if (install.type === 'native') {
-    if (!force) {
+    if (!force && !auto) {
       console.log('Native binary patching modifies a signed executable.');
       console.log('Use --force to proceed, or install via npm for safer patching:');
       console.log('  npm install -g @anthropic-ai/claude-code');
@@ -272,14 +316,18 @@ function patch() {
   }
 
   if (result.success) {
-    console.log(result.message);
-    if (!dryRun) {
+    log(result.message);
+    if (!dryRun && !auto) {
       console.log('\nRestart Claude Code for the patch to take effect.');
       console.log('AGENTS.md files will now be loaded alongside CLAUDE.md.');
     }
   } else {
-    console.error(result.message);
-    process.exit(1);
+    if (auto && result.message.includes('Already patched')) {
+      log('Already patched — nothing to do.');
+      return;
+    }
+    log(result.message);
+    if (!auto) process.exit(1);
   }
 }
 
@@ -318,9 +366,29 @@ function unpatch() {
   }
 }
 
+function watch() {
+  const result = installWatch();
+  if (result.success) {
+    console.log(result.message);
+  } else {
+    console.error(result.message);
+    process.exit(1);
+  }
+}
+
+function unwatch() {
+  const result = removeWatch();
+  if (result.success) {
+    console.log(result.message);
+  } else {
+    console.error(result.message);
+    process.exit(1);
+  }
+}
+
 // CLI dispatch
 const command = process.argv[2];
-const commands = { setup, remove, status, doctor, preview, patch, unpatch };
+const commands = { setup, remove, status, doctor, preview, patch, unpatch, watch, unwatch };
 
 if (!command || command === '--help' || command === '-h') {
   console.log(`cc-agents-md — Load AGENTS.md into Claude Code sessions
@@ -335,6 +403,8 @@ Usage:
 Experimental:
   cc-agents-md patch     Patch Claude Code to load AGENTS.md natively
   cc-agents-md unpatch   Restore Claude Code to original state
+  cc-agents-md watch     Auto-repatch after Homebrew upgrades (macOS)
+  cc-agents-md unwatch   Remove the auto-repatch watcher
 
 Patch options:
   --dry-run        Show what would be patched without modifying files
