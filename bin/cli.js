@@ -9,6 +9,7 @@ const { readSettings, writeSettings, isInstalled, addHook, removeHook } = requir
 const { detectInstallation, detectNpm, detectNative } = require('../lib/detect');
 const { patchNpm, unpatchNpm, isPatched: isPatchedSource, backupPath } = require('../lib/patcher');
 const { patchNative, unpatchNative } = require('../lib/patch-native');
+const { patchBun, unpatchBun } = require('../lib/patch-bun');
 
 const HOME = process.env.HOME || process.env.USERPROFILE;
 if (!HOME) {
@@ -255,12 +256,16 @@ function patch() {
     result = patchNpm(install.path, { dryRun });
   } else if (install.type === 'native') {
     if (!force) {
-      console.log('Native binary patching is risky — it modifies a signed executable.');
+      console.log('Native binary patching modifies a signed executable.');
       console.log('Use --force to proceed, or install via npm for safer patching:');
       console.log('  npm install -g @anthropic-ai/claude-code');
       process.exit(1);
     }
-    result = patchNative(install.path, { dryRun });
+    // Try Bun-format-aware patching first, fall back to legacy byte replacement
+    result = patchBun(install.path, { dryRun });
+    if (!result.success && result.message.includes('no __BUN section')) {
+      result = patchNative(install.path, { dryRun });
+    }
   } else {
     console.error(`Unsupported installation type: ${install.type}`);
     process.exit(1);
@@ -295,7 +300,11 @@ function unpatch() {
   if (install.type === 'npm') {
     result = unpatchNpm(install.path);
   } else if (install.type === 'native') {
-    result = unpatchNative(install.path);
+    // Try Bun unpatch first, fall back to legacy
+    result = unpatchBun(install.path);
+    if (!result.success && result.message.includes('no backup')) {
+      result = unpatchNative(install.path);
+    }
   } else {
     console.error(`Unsupported installation type: ${install.type}`);
     process.exit(1);
