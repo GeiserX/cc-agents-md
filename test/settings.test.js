@@ -65,7 +65,7 @@ describe('settings.js', () => {
   it('isInstalled returns true when hook is present (substring fallback)', () => {
     const settings = {
       hooks: {
-        SessionStart: [{ matcher: '', hooks: [{ type: 'command', command: '/path/agents-md-loader.sh' }] }]
+        SessionStart: [{ matcher: '', hooks: [{ type: 'command', command: '/path/cc-agents-md.sh' }] }]
       }
     };
     assert.strictEqual(isInstalled(settings), true);
@@ -74,11 +74,11 @@ describe('settings.js', () => {
   it('isInstalled with exact path matches only that path', () => {
     const settings = {
       hooks: {
-        SessionStart: [{ matcher: '', hooks: [{ type: 'command', command: '/home/user/.claude/hooks/agents-md-loader.sh' }] }]
+        SessionStart: [{ matcher: '', hooks: [{ type: 'command', command: '/home/user/.claude/hooks/cc-agents-md.sh' }] }]
       }
     };
-    assert.strictEqual(isInstalled(settings, '/home/user/.claude/hooks/agents-md-loader.sh'), true);
-    assert.strictEqual(isInstalled(settings, '/other/path/agents-md-loader.sh'), false);
+    assert.strictEqual(isInstalled(settings, '/home/user/.claude/hooks/cc-agents-md.sh'), true);
+    assert.strictEqual(isInstalled(settings, '/other/path/cc-agents-md.sh'), false);
   });
 
   it('addHook adds to empty settings', () => {
@@ -100,7 +100,7 @@ describe('settings.js', () => {
   });
 
   it('removeHook with exact path removes only that entry', () => {
-    const hookPath = '/home/user/.claude/hooks/agents-md-loader.sh';
+    const hookPath = '/home/user/.claude/hooks/cc-agents-md.sh';
     const settings = {
       hooks: {
         SessionStart: [
@@ -119,7 +119,7 @@ describe('settings.js', () => {
       hooks: {
         SessionStart: [
           { matcher: '', hooks: [{ type: 'command', command: 'echo other' }] },
-          { matcher: '', hooks: [{ type: 'command', command: '/path/agents-md-loader.sh' }] }
+          { matcher: '', hooks: [{ type: 'command', command: '/path/cc-agents-md.sh' }] }
         ]
       }
     };
@@ -129,7 +129,7 @@ describe('settings.js', () => {
   });
 
   it('removeHook cleans up empty hooks object', () => {
-    const hookPath = '/agents-md-loader.sh';
+    const hookPath = '/cc-agents-md.sh';
     const settings = {
       hooks: {
         SessionStart: [{ matcher: '', hooks: [{ type: 'command', command: hookPath }] }]
