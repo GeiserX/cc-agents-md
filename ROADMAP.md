@@ -8,7 +8,7 @@
 - Configurable threshold via `AGENTS_MD_INLINE_THRESHOLD`
 - Security hardening: symlink rejection, shell injection prevention, file permissions
 
-## v0.4.0 (current) — Experimental internal patching
+## v0.4.0 — Experimental internal patching
 
 Modify Claude Code's internal file-loading logic to recognize `AGENTS.md` natively alongside `CLAUDE.md`:
 
@@ -39,6 +39,18 @@ The patch wraps this with a fallback that uses `path.replace("CLAUDE","AGENTS")`
 
 For **npm** installs: direct source file patching (simple text replacement).
 For **Homebrew** (Bun standalone binary): Mach-O-aware patching that expands source into disabled bytecode space. See "Bun standalone binary format" below for details.
+
+## v0.5.0 (current) — Robust Bun patching + auto-repatch
+
+Hardened the Homebrew binary patcher for reliability across Claude Code upgrades:
+
+- **Trailer-anchored navigation** — dynamically discovers source region by parsing the Bun trailer backwards instead of hardcoding offsets (164, 420, 424)
+- **Tiered regex fallback** — 3 patterns from strict to relaxed; logs which tier matched
+- **Post-patch verification** — runs `--version` after patching, auto-restores backup on failure
+- **Bytecode sanity check** — verifies boundary (`// @bun` probe) before zeroing 64 bytes
+- **Version metadata** — stores `{ version, regexTier, growth }` alongside backup for `doctor` diagnostics and stale-patch detection
+- **Auto-repatch watcher** — `cc-agents-md watch` installs a macOS LaunchAgent that monitors `/opt/homebrew/Caskroom/claude-code` and reapplies the patch after `brew upgrade`
+- **Security** — `execFileSync` with arg arrays (no shell injection), proper `__bun` section name matching
 
 ## Bun standalone binary format (reference)
 
