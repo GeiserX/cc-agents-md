@@ -172,9 +172,12 @@ if [ "$HOOK_MODE" = "prompt" ] || [ "$HOOK_MODE" = "compact" ]; then
   # Use node for reliable JSON escaping (node is available — cc-agents-md requires Node 18+)
   if command -v node >/dev/null 2>&1; then
     json_output="$(node -e "process.stdout.write(JSON.stringify({additionalContext: process.argv[1]}))" -- "$output")"
-  else
+  elif command -v python3 >/dev/null 2>&1; then
     # Fallback: use python3 for JSON escaping
     json_output="$(printf '%s' "$output" | python3 -c "import sys,json; print(json.dumps({'additionalContext': sys.stdin.read()}),end='')" 2>/dev/null)"
+  else
+    # Last resort: output nothing rather than malformed JSON
+    exit 0
   fi
   printf '%s' "$json_output"
 

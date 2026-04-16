@@ -665,14 +665,18 @@ function migrate() {
     // Read content and replace @AGENTS.md import references
     // (these are CLAUDE.md -> AGENTS.md import directives that become self-referential after migration)
     let content = readFileSync(src, 'utf8');
-    const agentsRefs = (content.match(/@AGENTS\.md/g) || []).length;
-    content = content.replace(/@AGENTS\.md/g, '');
+    const agentsRefs = (content.match(/^\s*@AGENTS\.md\s*$/gm) || []).length;
+    content = content.replace(/^\s*@AGENTS\.md\s*$(?:\r?\n)?/gm, '');
 
     if (dryRun) {
       migrated.push({ source: relSrc, target: relTarget, refsRemoved: agentsRefs });
+      if (deleteOriginals) {
+        deleted.push(relSrc);
+      }
       if (!JSON_FLAG) {
         let msg = `  would migrate: ${relSrc} -> ${relTarget}`;
         if (agentsRefs > 0) msg += ` (${agentsRefs} @AGENTS.md ref(s) removed)`;
+        if (deleteOriginals) msg += ' (would delete original)';
         console.log(msg);
       }
     } else {
@@ -729,6 +733,7 @@ Diagnostics:
 Migrate options:
   --dry-run        Preview migration without making changes
   --delete         Delete original CLAUDE.md files after copying
+  --json           Machine-readable output for migration results
 
 Patch options:
   --dry-run        Show what would be patched without modifying files
