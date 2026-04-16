@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 'use strict';
 
-const { copyFileSync, unlinkSync, existsSync, chmodSync, statSync, readFileSync, realpathSync } = require('fs');
-const { join, dirname } = require('path');
+const { copyFileSync, unlinkSync, existsSync, chmodSync, statSync, readFileSync, writeFileSync, realpathSync } = require('fs');
+const { join, dirname, relative } = require('path');
 const { execSync, execFileSync } = require('child_process');
 const { mkdirSync } = require('fs');
-const { readSettings, writeSettings, isInstalled, addHook, removeHook } = require('../lib/settings');
+const { readSettings, writeSettings, isInstalled, isEventRegistered, addHook, removeHook, HOOK_EVENTS } = require('../lib/settings');
 const { detectInstallation, detectNpm, detectNative } = require('../lib/detect');
 const { patchNpm, unpatchNpm, isPatched: isPatchedSource, backupPath } = require('../lib/patcher');
 const { patchNative, unpatchNative } = require('../lib/patch-native');
@@ -85,7 +85,9 @@ function setup() {
   console.log('Installed successfully.');
   console.log(`  Hook script: ${HOOK_SCRIPT}`);
   console.log(`  Settings:    ${SETTINGS_PATH}`);
-  console.log('\nRestart Claude Code for changes to take effect.');
+  console.log(`  Hooks:       SessionStart, UserPromptSubmit, PreCompact`);
+  console.log('\nAGENTS.md changes are detected mid-session and instructions survive context compression.');
+  console.log('Restart Claude Code for changes to take effect.');
 }
 
 function remove() {
@@ -129,10 +131,17 @@ function status() {
     }
   });
 
+  // Check all three hook events
+  const hookEvents = {};
+  for (const event of HOOK_EVENTS) {
+    hookEvents[event] = isEventRegistered(settings, event);
+  }
+
   if (JSON_FLAG) {
     console.log(JSON.stringify({
       hookInstalled: installed,
       hookScript: scriptExists ? HOOK_SCRIPT : null,
+      hookEvents,
       project: cwd,
       gitRoot: root,
       config: configPath ? { path: configPath, ...config } : null,
@@ -143,6 +152,7 @@ function status() {
 
   console.log(`Hook installed: ${installed ? 'yes' : 'no'}`);
   console.log(`Hook script:    ${scriptExists ? 'exists' : 'missing'}`);
+  console.log(`Hook events:    ${HOOK_EVENTS.map(e => `${e} ${hookEvents[e] ? 'yes' : 'no'}`).join(', ')}`);
 
   console.log(`\nProject:  ${cwd}`);
   console.log(`Git root: ${root}`);
@@ -183,6 +193,11 @@ function doctor() {
   const settings = readSettings(SETTINGS_PATH);
   check('Hook registered in settings.json', isInstalled(settings, HOOK_SCRIPT));
   check('Hook script exists', existsSync(HOOK_SCRIPT), HOOK_SCRIPT);
+
+  // Check all three hook events
+  for (const event of HOOK_EVENTS) {
+    check(`${event} hook registered`, isEventRegistered(settings, event, HOOK_SCRIPT) || isEventRegistered(settings, event));
+  }
 
   if (existsSync(HOOK_SCRIPT) && process.platform !== 'win32') {
     const stat = statSync(HOOK_SCRIPT);
@@ -578,19 +593,132 @@ function unwatch() {
   }
 }
 
+function migrate() {
+  const dryRun = process.argv.includes('--dry-run');
+  const deleteOriginals = process.argv.includes('--delete');
+
+  const cwd = process.cwd();
+  let root;
+  try {
+    root = execFileSync('git', ['rev-parse', '--show-toplevel'], {
+      cwd, encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'],
+    }).trim();
+  } catch {
+    root = cwd;
+  }
+
+  // Walk from CWD up to git root, collecting CLAUDE.md variants
+  const CLAUDE_NAMES = ['CLAUDE.md', 'CLAUDE.local.md'];
+  const CLAUDE_DIR_NAME = '.claude';
+  const found = [];
+
+  let dir;
+  try { dir = realpathSync(cwd); } catch { dir = cwd; }
+  let realRoot;
+  try { realRoot = realpathSync(root); } catch { realRoot = root; }
+
+  while (true) {
+    for (const name of CLAUDE_NAMES) {
+      const candidate = join(dir, name);
+      if (existsSync(candidate)) {
+        found.push(candidate);
+      }
+    }
+    // Check .claude/ subdirectory
+    const dotClaudeFile = join(dir, CLAUDE_DIR_NAME, 'CLAUDE.md');
+    if (existsSync(dotClaudeFile)) {
+      found.push(dotClaudeFile);
+    }
+
+    if (dir === realRoot) break;
+    const parent = dirname(dir);
+    if (parent === dir) break;
+    dir = parent;
+  }
+
+  if (found.length === 0) {
+    if (JSON_FLAG) {
+      console.log(JSON.stringify({ migrated: [], skipped: [], deleted: [] }));
+    } else {
+      console.log('No CLAUDE.md files found on path from CWD to git root.');
+    }
+    return;
+  }
+
+  const migrated = [];
+  const skipped = [];
+  const deleted = [];
+
+  for (const src of found) {
+    const target = src.replace(/CLAUDE\.md$/, 'AGENTS.md').replace(/CLAUDE\.local\.md$/, 'AGENTS.local.md');
+    const relSrc = relative(realRoot, src) || src;
+    const relTarget = relative(realRoot, target) || target;
+
+    if (existsSync(target)) {
+      skipped.push({ source: relSrc, target: relTarget, reason: 'target already exists' });
+      if (!JSON_FLAG) {
+        console.log(`  skip: ${relSrc} -> ${relTarget} (already exists)`);
+      }
+      continue;
+    }
+
+    // Read content and replace @AGENTS.md import references
+    // (these are CLAUDE.md -> AGENTS.md import directives that become self-referential after migration)
+    let content = readFileSync(src, 'utf8');
+    const agentsRefs = (content.match(/^\s*@AGENTS\.md\s*$/gm) || []).length;
+    content = content.replace(/^\s*@AGENTS\.md\s*$(?:\r?\n)?/gm, '');
+
+    if (dryRun) {
+      migrated.push({ source: relSrc, target: relTarget, refsRemoved: agentsRefs });
+      if (deleteOriginals) {
+        deleted.push(relSrc);
+      }
+      if (!JSON_FLAG) {
+        let msg = `  would migrate: ${relSrc} -> ${relTarget}`;
+        if (agentsRefs > 0) msg += ` (${agentsRefs} @AGENTS.md ref(s) removed)`;
+        if (deleteOriginals) msg += ' (would delete original)';
+        console.log(msg);
+      }
+    } else {
+      writeFileSync(target, content, 'utf8');
+      migrated.push({ source: relSrc, target: relTarget, refsRemoved: agentsRefs });
+      if (!JSON_FLAG) {
+        let msg = `  migrated: ${relSrc} -> ${relTarget}`;
+        if (agentsRefs > 0) msg += ` (${agentsRefs} @AGENTS.md ref(s) removed)`;
+        console.log(msg);
+      }
+
+      if (deleteOriginals) {
+        unlinkSync(src);
+        deleted.push(relSrc);
+        if (!JSON_FLAG) {
+          console.log(`  deleted: ${relSrc}`);
+        }
+      }
+    }
+  }
+
+  if (JSON_FLAG) {
+    console.log(JSON.stringify({ migrated, skipped, deleted }, null, 2));
+  } else {
+    console.log(`\nSummary: ${migrated.length} migrated, ${skipped.length} skipped${deleteOriginals ? `, ${deleted.length} deleted` : ''}.${dryRun ? ' (dry run)' : ''}`);
+  }
+}
+
 // CLI dispatch
 const command = process.argv[2];
-const commands = { setup, remove, status, doctor, preview, patch, unpatch, watch, unwatch, logs, diff };
+const commands = { setup, remove, status, doctor, preview, migrate, patch, unpatch, watch, unwatch, logs, diff };
 
 if (!command || command === '--help' || command === '-h') {
   console.log(`cc-agents-md — Load AGENTS.md into Claude Code sessions
 
 Usage:
-  cc-agents-md setup     Install the SessionStart hook
+  cc-agents-md setup     Install hooks (SessionStart + mid-session reload)
   cc-agents-md remove    Uninstall completely
   cc-agents-md status    Show installation state and detected files
   cc-agents-md doctor    Full health check
   cc-agents-md preview   Show what Claude would see
+  cc-agents-md migrate   Convert CLAUDE.md files to AGENTS.md format
 
 Experimental:
   cc-agents-md patch     Patch Claude Code to load AGENTS.md natively
@@ -601,6 +729,11 @@ Experimental:
 Diagnostics:
   cc-agents-md logs      Show auto-repatch watcher log
   cc-agents-md diff      Show what the patch changed
+
+Migrate options:
+  --dry-run        Preview migration without making changes
+  --delete         Delete original CLAUDE.md files after copying
+  --json           Machine-readable output for migration results
 
 Patch options:
   --dry-run        Show what would be patched without modifying files

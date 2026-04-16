@@ -14,12 +14,13 @@ Claude Code only reads `CLAUDE.md`. The [AGENTS.md specification](https://agents
 
 ## How It Works
 
-A `SessionStart` hook is registered in `~/.claude/settings.json`. On every new Claude Code session, the hook:
+Three hooks are registered in `~/.claude/settings.json`:
 
-1. Walks **upward** from your working directory to the git root
-2. Collects every `AGENTS.md` on the path
-3. Small files are **inlined** directly into Claude's context
-4. Large files get a **read instruction** — Claude reads the full file on demand
+1. **SessionStart** — On every new Claude Code session, walks upward from your working directory to the git root, collects every `AGENTS.md` on the path, and injects the content
+2. **UserPromptSubmit** — On each user message, checks if AGENTS.md files changed since last injection. If changed, re-injects updated content. If unchanged, exits silently (zero overhead)
+3. **PreCompact** — Before context compression, re-injects AGENTS.md content so instructions survive in long sessions
+
+Small files are **inlined** directly into Claude's context. Large files get a **read instruction** — Claude reads the full file on demand.
 
 ```text
 monorepo/
@@ -64,6 +65,7 @@ npx cc-agents-md remove
 | `status`  | Show installation state and detected AGENTS.md     |
 | `doctor`  | Full health check (hook, patch, watcher, config)   |
 | `preview` | Print exactly what Claude would see                |
+| `migrate` | Convert CLAUDE.md files to AGENTS.md format        |
 | `patch`   | **Experimental** — patch Claude Code internals     |
 | `unpatch` | Restore Claude Code to original state              |
 | `watch`   | Auto-repatch after Claude Code upgrades (macOS/Linux) |

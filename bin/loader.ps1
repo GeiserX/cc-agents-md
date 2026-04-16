@@ -1,10 +1,17 @@
-# cc-agents-md: Loads AGENTS.md files for Claude Code SessionStart hook.
+# cc-agents-md: Loads AGENTS.md files for Claude Code hooks.
 # PowerShell equivalent of loader.sh for Windows systems.
 # Walks from $env:CLAUDE_PROJECT_DIR up to git root, outputs root-first.
 # Supports .agents-md.json config for custom patterns, exclusions, and caching.
 # Small files are inlined fully; large files get a read instruction.
+#
+# AGENTS_MD_HOOK_MODE controls output format:
+#   session (default) — plain text (SessionStart hook)
+#   prompt            — JSON with change detection (UserPromptSubmit hook)
+#   compact           — JSON, always re-inject (PreCompact hook)
 
 $ErrorActionPreference = 'SilentlyContinue'
+
+$hookMode = if ($env:AGENTS_MD_HOOK_MODE) { $env:AGENTS_MD_HOOK_MODE } else { 'session' }
 
 # Resolve project directory
 $project = if ($env:CLAUDE_PROJECT_DIR) { $env:CLAUDE_PROJECT_DIR } else { Get-Location }
@@ -92,7 +99,20 @@ if ($cacheEnabled) {
   $sha.Dispose()
 
   $cacheFile = Join-Path $cacheDir $cacheHash
-  if (Test-Path $cacheFile -PathType Leaf) {
+
+  # For prompt mode: check if files changed since last injection
+  if ($hookMode -eq 'prompt') {
+    $lastInjectedFile = Join-Path $cacheDir '.last-injected'
+    if (Test-Path $lastInjectedFile -PathType Leaf) {
+      $lastHash = (Get-Content $lastInjectedFile -Raw).Trim()
+      if ($lastHash -eq $cacheHash) {
+        # Files unchanged since last injection — output nothing
+        exit 0
+      }
+    }
+  }
+
+  if ((Test-Path $cacheFile -PathType Leaf) -and $hookMode -eq 'session') {
     Get-Content $cacheFile -Raw
     exit 0
   }
@@ -120,15 +140,31 @@ foreach ($f in $files) {
   }
 }
 
-Write-Output $output
+# --- Output based on hook mode ---
+if ($hookMode -eq 'prompt' -or $hookMode -eq 'compact') {
+  # JSON output for UserPromptSubmit / PreCompact hooks
+  $jsonObj = @{ additionalContext = $output }
+  $jsonOutput = $jsonObj | ConvertTo-Json -Compress
+  Write-Output $jsonOutput
+
+  # Update last-injected marker for prompt mode change detection
+  if ($hookMode -eq 'prompt' -and $cacheHash) {
+    if (-not (Test-Path $cacheDir)) { New-Item -ItemType Directory -Path $cacheDir -Force | Out-Null }
+    Set-Content -Path (Join-Path $cacheDir '.last-injected') -Value $cacheHash -NoNewline -ErrorAction SilentlyContinue
+  }
+} else {
+  # Plain text output for SessionStart hook
+  Write-Output $output
+}
 
 # --- Write cache ---
 if ($cacheEnabled -and $cacheHash) {
   if (-not (Test-Path $cacheDir)) { New-Item -ItemType Directory -Path $cacheDir -Force | Out-Null }
   Set-Content -Path $cacheFile -Value $output -NoNewline -ErrorAction SilentlyContinue
 
-  # Prune old cache files (keep newest 20)
+  # Prune old cache files (keep newest 20, skip dotfiles like .last-injected)
   $cacheFiles = Get-ChildItem $cacheDir -File -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -notlike '.*' } |
     Sort-Object LastWriteTime -Descending |
     Select-Object -Skip 20
   foreach ($old in $cacheFiles) { Remove-Item $old.FullName -Force -ErrorAction SilentlyContinue }

@@ -1,9 +1,17 @@
 #!/usr/bin/env bash
-# cc-agents-md: Loads AGENTS.md files for Claude Code SessionStart hook.
+# cc-agents-md: Loads AGENTS.md files for Claude Code hooks.
 # Walks from $CLAUDE_PROJECT_DIR up to git root, outputs root-first.
 # Small files are inlined fully; large files get a read instruction.
 # Supports .agents-md.json config for custom patterns, exclusions, and caching.
+#
+# AGENTS_MD_HOOK_MODE controls output format:
+#   session (default) — plain text (SessionStart hook)
+#   prompt            — JSON with change detection (UserPromptSubmit hook)
+#   compact           — JSON, always re-inject (PreCompact hook)
+#
 # All errors silenced — never block a session.
+
+HOOK_MODE="${AGENTS_MD_HOOK_MODE:-session}"
 
 PROJECT="${CLAUDE_PROJECT_DIR:-.}"
 
@@ -109,7 +117,20 @@ if [ "$CACHE_ENABLED" = "1" ]; then
 
   if [ -n "$cache_hash" ]; then
     cache_file="$CACHE_DIR/${cache_hash}"
-    if [ -f "$cache_file" ]; then
+
+    # For prompt mode: check if files changed since last injection
+    if [ "$HOOK_MODE" = "prompt" ]; then
+      last_injected_file="$CACHE_DIR/.last-injected"
+      if [ -f "$last_injected_file" ]; then
+        last_hash="$(cat "$last_injected_file" 2>/dev/null)"
+        if [ "$last_hash" = "$cache_hash" ]; then
+          # Files unchanged since last injection — output nothing
+          exit 0
+        fi
+      fi
+    fi
+
+    if [ -f "$cache_file" ] && [ "$HOOK_MODE" = "session" ]; then
       cat "$cache_file"
       exit 0
     fi
@@ -145,17 +166,40 @@ for f in "${reversed[@]}"; do
   fi
 done
 
-printf '%s' "$output"
+# --- Output based on hook mode ---
+if [ "$HOOK_MODE" = "prompt" ] || [ "$HOOK_MODE" = "compact" ]; then
+  # JSON output for UserPromptSubmit / PreCompact hooks
+  # Use node for reliable JSON escaping (node is available — cc-agents-md requires Node 18+)
+  if command -v node >/dev/null 2>&1; then
+    json_output="$(node -e "process.stdout.write(JSON.stringify({additionalContext: process.argv[1]}))" -- "$output")"
+  elif command -v python3 >/dev/null 2>&1; then
+    # Fallback: use python3 for JSON escaping
+    json_output="$(printf '%s' "$output" | python3 -c "import sys,json; print(json.dumps({'additionalContext': sys.stdin.read()}),end='')" 2>/dev/null)"
+  else
+    # Last resort: output nothing rather than malformed JSON
+    exit 0
+  fi
+  printf '%s' "$json_output"
+
+  # Update last-injected marker for prompt mode change detection
+  if [ "$HOOK_MODE" = "prompt" ] && [ -n "${cache_hash:-}" ]; then
+    mkdir -p "$CACHE_DIR" 2>/dev/null
+    printf '%s' "$cache_hash" > "$CACHE_DIR/.last-injected" 2>/dev/null
+  fi
+else
+  # Plain text output for SessionStart hook
+  printf '%s' "$output"
+fi
 
 # --- Write cache ---
 if [ "$CACHE_ENABLED" = "1" ] && [ -n "${cache_hash:-}" ]; then
   mkdir -p "$CACHE_DIR" 2>/dev/null
   printf '%s' "$output" > "$cache_file" 2>/dev/null
 
-  # Prune old cache files (keep newest 20)
+  # Prune old cache files (keep newest 20, skip dotfiles like .last-injected)
   if [ -d "$CACHE_DIR" ]; then
     # shellcheck disable=SC2012
-    ls -1t "$CACHE_DIR" 2>/dev/null | tail -n +21 | while read -r old; do
+    ls -1t "$CACHE_DIR" 2>/dev/null | grep -v '^\.' | tail -n +21 | while read -r old; do
       rm -f "$CACHE_DIR/$old" 2>/dev/null
     done
   fi
