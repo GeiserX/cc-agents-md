@@ -147,7 +147,7 @@ function doctor() {
   check('Hook registered in settings.json', isInstalled(settings, HOOK_SCRIPT));
   check('Hook script exists', existsSync(HOOK_SCRIPT), HOOK_SCRIPT);
 
-  if (existsSync(HOOK_SCRIPT)) {
+  if (existsSync(HOOK_SCRIPT) && process.platform !== 'win32') {
     const stat = statSync(HOOK_SCRIPT);
     check('Hook script is executable', (stat.mode & 0o111) !== 0);
   }
@@ -195,11 +195,9 @@ function doctor() {
   }
 
   // Check watcher status
-  if (process.platform === 'darwin') {
-    const ws = watchStatus();
-    if (ws.installed) {
-      check('Auto-repatch watcher installed', true, ws.loaded ? 'loaded' : 'installed but not loaded');
-    }
+  const ws = watchStatus();
+  if (ws.installed) {
+    check('Auto-repatch watcher installed', true, ws.loaded ? 'loaded' : 'installed but not loaded');
   }
 
   console.log(`\n${ok ? 'All checks passed.' : 'Issues found — see above.'}`);
@@ -217,11 +215,13 @@ function preview() {
     if (!env.CLAUDE_PROJECT_DIR) {
       env.CLAUDE_PROJECT_DIR = process.cwd();
     }
-    const output = execFileSync('bash', [HOOK_SCRIPT], {
-      encoding: 'utf8',
-      env,
-      timeout: 10000
-    });
+    const output = process.platform === 'win32'
+      ? execFileSync('powershell', ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', HOOK_SCRIPT], {
+        encoding: 'utf8', env, timeout: 10000,
+      })
+      : execFileSync('bash', [HOOK_SCRIPT], {
+        encoding: 'utf8', env, timeout: 10000,
+      });
     if (output.trim()) {
       process.stdout.write(output);
     } else {

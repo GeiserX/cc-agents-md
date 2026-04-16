@@ -48,12 +48,15 @@ if ($files.Count -eq 0) { exit 0 }
 # Output: inline small files, read instruction for large ones
 foreach ($f in $files) {
   $rel = $f
-  if ($f.StartsWith($root)) {
-    $rel = $f.Substring($root.Length).TrimStart('\', '/')
+  $normalRoot = $root.Replace('/', '\')
+  $normalF = $f.Replace('/', '\')
+  if ($normalF.StartsWith($normalRoot)) {
+    $rel = $normalF.Substring($normalRoot.Length).TrimStart('\')
     if (-not $rel) { $rel = 'AGENTS.md' }
   }
 
-  $lines = (Get-Content $f -ErrorAction SilentlyContinue | Measure-Object -Line).Lines
+  $content = @(Get-Content $f -ErrorAction SilentlyContinue)
+  $lines = $content.Count
 
   if ($lines -le $threshold) {
     Write-Output "# AGENTS.md - $rel"
