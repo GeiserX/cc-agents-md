@@ -42,7 +42,7 @@ The patch wraps the catch block with a fallback: `H.replace("CLAUDE","AGENTS")` 
 - Respects the same walk-up discovery Claude Code uses for CLAUDE.md
 - Must be reapplied after Claude Code updates
 
-### v0.5.0 (current) — Robust Bun patching, auto-repatch, cross-platform
+### v0.5.0 — Robust Bun patching, auto-repatch, cross-platform
 
 Major reliability overhaul for Homebrew binary patching, plus platform expansion.
 
@@ -145,26 +145,51 @@ Steps:
 
 ---
 
-## Planned
+### v0.6.0 — Cross-platform support
 
-### v0.6.0 — Caching and performance
+- **Windows PowerShell loader** (`bin/loader.ps1`) — Port of `loader.sh` for Windows SessionStart hook
+- **Linux systemd watcher** — auto-repatch via `systemctl --user` path unit + oneshot service
+- **CLI platform awareness** — `setup`, `preview`, `doctor` dispatch correctly per platform
+- Windows hook detection in `settings.js` (`.ps1` support in `isInstalled`/`removeHook`)
+- `watch.js` uses `execFileSync` throughout (no shell string injection)
 
-- **Content hashing** — SHA-256 hash of AGENTS.md files to skip re-injection when content hasn't changed
-- **Session-aware caching** — Persist hash state per project directory so the hook returns instantly on unchanged files
-- **Benchmark suite** — Measure hook latency across file counts and sizes
+### v0.7.0 (current) — Caching, diagnostics, configuration
 
-### v0.7.0 — Enhanced diagnostics
+All remaining planned roadmap items shipped in one release.
 
-- **`cc-agents-md logs`** — Tail or search the autopatch log (`~/.claude/cc-agents-md-autopatch.log`)
-- **`cc-agents-md diff`** — Show what the patch changed in Claude Code's source (diff between backup and current)
-- **Structured JSON output** — `--json` flag for `status`, `doctor`, and `preview` for CI/scripting integration
-- **Verbose mode** — `--verbose` flag showing regex tier matched, byte offsets, source sizes during `patch`
+#### Caching and performance
 
-### v0.8.0 — Configuration file
+- **Stat-based output caching** — The loader hashes file paths + modification times + config values (SHA-256) and caches the assembled output in `~/.claude/cc-agents-md-cache/`. On cache hit, the loader returns instantly without reading or assembling files. Cache is automatically pruned to the 20 most recent entries.
+- **Cache key includes config** — Changing the inline threshold, patterns, or exclude list invalidates the cache.
+- **Benchmark suite** (`bench/benchmark.sh`) — Measures hook latency across scenarios: no files (baseline), small/medium/large single files, nested monorepo, and cached runs.
 
-- **`.agents-md.json`** — Per-project configuration (inline threshold, file patterns, exclusions)
-- **Custom file patterns** — Support loading files other than `AGENTS.md` (e.g., `GUIDELINES.md`, `RULES.md`)
-- **Exclude patterns** — Skip specific directories or files from walk-up discovery
+#### Enhanced diagnostics
+
+- **`cc-agents-md logs`** — Tail the auto-repatch watcher log (`~/.claude/cc-agents-md-autopatch.log`). Supports `--lines N` (default: 50).
+- **`cc-agents-md diff`** — Show what the patch changed. For npm installs: unified diff between backup and current `cli.js`. For native binaries: patch metadata (version, regex tier, byte growth, source sizes).
+- **`--json` flag** — Machine-readable JSON output for `status`, `doctor`, `preview`, `logs`, and `diff`. Designed for CI pipelines and scripting.
+- **`--verbose` flag** — Extra output during `patch`: shows config file path, patterns, cache setting, and post-patch details (regex tier, source growth, size locations).
+
+#### Configuration file
+
+- **`.agents-md.json`** — Per-project configuration file, discovered via walk-up from working directory. Parsed by both the Node CLI (`lib/config.js`) and the bash/PowerShell loaders (via `node -e` / `ConvertFrom-Json`).
+- **Custom file patterns** — `"patterns": ["AGENTS.md", "GUIDELINES.md"]` loads additional file types alongside AGENTS.md.
+- **Exclude patterns** — `"exclude": ["vendor", "node_modules"]` skips directories during walk-up discovery.
+- **Threshold override** — `"threshold": 100` overrides the default 200-line inline threshold.
+- **Cache toggle** — `"cache": false` disables stat-based caching.
+
+Example `.agents-md.json`:
+
+```json
+{
+  "threshold": 150,
+  "patterns": ["AGENTS.md", "RULES.md"],
+  "exclude": ["vendor"],
+  "cache": true
+}
+```
+
+Environment variables (`AGENTS_MD_INLINE_THRESHOLD`, `AGENTS_MD_PATTERNS`, `AGENTS_MD_EXCLUDE`, `AGENTS_MD_CACHE`) take precedence over the config file for CI overrides.
 
 ---
 

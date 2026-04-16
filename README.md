@@ -62,12 +62,21 @@ npx cc-agents-md remove
 | `setup`   | Install the SessionStart hook globally             |
 | `remove`  | Uninstall completely (hook + script)               |
 | `status`  | Show installation state and detected AGENTS.md     |
-| `doctor`  | Full health check (hook, patch, watcher)           |
+| `doctor`  | Full health check (hook, patch, watcher, config)   |
 | `preview` | Print exactly what Claude would see                |
 | `patch`   | **Experimental** — patch Claude Code internals     |
 | `unpatch` | Restore Claude Code to original state              |
 | `watch`   | Auto-repatch after Claude Code upgrades (macOS/Linux) |
 | `unwatch` | Remove the auto-repatch watcher                    |
+| `logs`    | Show auto-repatch watcher log (`--lines N`)        |
+| `diff`    | Show what the patch changed (unified diff or metadata) |
+
+### Output flags
+
+| Flag        | Description                                      |
+|-------------|--------------------------------------------------|
+| `--json`    | Machine-readable JSON (`status`, `doctor`, `preview`, `logs`, `diff`) |
+| `--verbose` | Extra detail during `patch` (regex tier, byte offsets, config) |
 
 ## Experimental: Internal Patching
 
@@ -126,12 +135,35 @@ Logs are written to `~/.claude/cc-agents-md-autopatch.log`.
 
 ## Configuration
 
-### Inline threshold
+### Config file
 
-Files under 200 lines are inlined fully. Larger files get a read instruction — Claude reads the full file on demand. Customize:
+Create `.agents-md.json` at your project root (or any ancestor directory) to customize behavior:
+
+```json
+{
+  "threshold": 150,
+  "patterns": ["AGENTS.md", "RULES.md"],
+  "exclude": ["vendor", "node_modules"],
+  "cache": true
+}
+```
+
+| Key         | Default          | Description                                        |
+|-------------|------------------|----------------------------------------------------|
+| `threshold` | `200`            | Lines — inline below, read instruction above       |
+| `patterns`  | `["AGENTS.md"]`  | File names to look for at each directory level      |
+| `exclude`   | `[]`             | Directory names to skip during walk-up discovery    |
+| `cache`     | `true`           | Cache assembled output based on file modification times |
+
+### Environment variables
+
+Environment variables override the config file (useful for CI):
 
 ```bash
 export AGENTS_MD_INLINE_THRESHOLD=200   # lines — inline below, read instruction above
+export AGENTS_MD_PATTERNS=AGENTS.md,RULES.md   # comma-separated file patterns
+export AGENTS_MD_EXCLUDE=vendor,dist            # comma-separated directories to skip
+export AGENTS_MD_CACHE=0                        # disable caching
 ```
 
 ## How is this different from...

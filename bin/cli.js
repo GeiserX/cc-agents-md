@@ -11,6 +11,7 @@ const { patchNpm, unpatchNpm, isPatched: isPatchedSource, backupPath } = require
 const { patchNative, unpatchNative } = require('../lib/patch-native');
 const { patchBun, unpatchBun, readPatchMeta } = require('../lib/patch-bun');
 const { installWatch, removeWatch, watchStatus } = require('../lib/watch');
+const { loadConfig, CONFIG_FILE } = require('../lib/config');
 
 const HOME = process.env.HOME || process.env.USERPROFILE;
 if (!HOME) {
@@ -106,9 +107,7 @@ function remove() {
 function status() {
   const settings = readSettings(SETTINGS_PATH);
   const installed = isInstalled(settings);
-
-  console.log(`Hook installed: ${installed ? 'yes' : 'no'}`);
-  console.log(`Hook script:    ${existsSync(HOOK_SCRIPT) ? 'exists' : 'missing'}`);
+  const scriptExists = existsSync(HOOK_SCRIPT);
 
   const cwd = process.cwd();
   let root;
@@ -118,28 +117,62 @@ function status() {
     root = cwd;
   }
 
+  const { config, configPath } = loadConfig(cwd);
+  const files = findAgentsMd(cwd, root);
+  const fileDetails = files.map(f => {
+    const lines = readFileSync(f, 'utf8').split('\n').length;
+    const rel = f.startsWith(root) ? f.slice(root.length + 1) || 'AGENTS.md' : f;
+    return { path: f, rel, lines };
+  });
+
+  if (JSON_FLAG) {
+    console.log(JSON.stringify({
+      hookInstalled: installed,
+      hookScript: scriptExists ? HOOK_SCRIPT : null,
+      project: cwd,
+      gitRoot: root,
+      config: configPath ? { path: configPath, ...config } : null,
+      files: fileDetails,
+    }, null, 2));
+    return;
+  }
+
+  console.log(`Hook installed: ${installed ? 'yes' : 'no'}`);
+  console.log(`Hook script:    ${scriptExists ? 'exists' : 'missing'}`);
+
   console.log(`\nProject:  ${cwd}`);
   console.log(`Git root: ${root}`);
 
-  const files = findAgentsMd(cwd, root);
-  if (files.length === 0) {
+  if (configPath) {
+    console.log(`Config:   ${configPath}`);
+    if (config.patterns.length > 1 || config.patterns[0] !== 'AGENTS.md') {
+      console.log(`Patterns: ${config.patterns.join(', ')}`);
+    }
+    if (config.exclude.length > 0) {
+      console.log(`Exclude:  ${config.exclude.join(', ')}`);
+    }
+  }
+
+  if (fileDetails.length === 0) {
     console.log('\nNo AGENTS.md files found on path.');
   } else {
-    console.log(`\nAGENTS.md files (${files.length}):`);
-    for (const f of files) {
-      const lines = readFileSync(f, 'utf8').split('\n').length;
-      const rel = f.startsWith(root) ? f.slice(root.length + 1) || 'AGENTS.md' : f;
-      console.log(`  ${rel} (${lines} lines)`);
+    console.log(`\nAGENTS.md files (${fileDetails.length}):`);
+    for (const f of fileDetails) {
+      console.log(`  ${f.rel} (${f.lines} lines)`);
     }
   }
 }
 
 function doctor() {
   let ok = true;
+  const checks = [];
 
   function check(label, pass, detail) {
-    const icon = pass ? '\u2713' : '\u2717';
-    console.log(`${icon} ${label}${detail ? ` \u2014 ${detail}` : ''}`);
+    checks.push({ label, pass, detail: detail || null });
+    if (!JSON_FLAG) {
+      const icon = pass ? '\u2713' : '\u2717';
+      console.log(`${icon} ${label}${detail ? ` \u2014 ${detail}` : ''}`);
+    }
     if (!pass) ok = false;
   }
 
@@ -165,6 +198,12 @@ function doctor() {
   const files = findAgentsMd(cwd, null);
   check('AGENTS.md found in project', files.length > 0,
     files.length > 0 ? `${files.length} file(s)` : 'none in current project');
+
+  // Check config file
+  const { configPath } = loadConfig(cwd);
+  if (configPath) {
+    check('Config file found', true, configPath);
+  }
 
   // Check patch status
   const install = detectInstallation();
@@ -200,7 +239,11 @@ function doctor() {
     check('Auto-repatch watcher installed', true, ws.loaded ? 'loaded' : 'installed but not loaded');
   }
 
-  console.log(`\n${ok ? 'All checks passed.' : 'Issues found — see above.'}`);
+  if (JSON_FLAG) {
+    console.log(JSON.stringify({ ok, checks }, null, 2));
+  } else {
+    console.log(`\n${ok ? 'All checks passed.' : 'Issues found — see above.'}`);
+  }
   process.exit(ok ? 0 : 1);
 }
 
@@ -223,13 +266,112 @@ function preview() {
         encoding: 'utf8', env, timeout: 10000,
       });
     if (output.trim()) {
-      process.stdout.write(output);
+      if (JSON_FLAG) {
+        console.log(JSON.stringify({ output: output.trimEnd() }));
+      } else {
+        process.stdout.write(output);
+      }
     } else {
-      console.log('No AGENTS.md files found — nothing would be injected.');
+      if (JSON_FLAG) {
+        console.log(JSON.stringify({ output: null }));
+      } else {
+        console.log('No AGENTS.md files found — nothing would be injected.');
+      }
     }
   } catch (err) {
     console.error(`Error running loader: ${err.message}`);
     process.exit(1);
+  }
+}
+
+function logs() {
+  const LOG_PATH = join(HOME, '.claude', 'cc-agents-md-autopatch.log');
+  if (!existsSync(LOG_PATH)) {
+    if (JSON_FLAG) {
+      console.log(JSON.stringify({ error: 'No log file found', path: LOG_PATH }));
+    } else {
+      console.log(`No log file found at ${LOG_PATH}`);
+      console.log('Logs are created by the auto-repatch watcher (cc-agents-md watch).');
+    }
+    return;
+  }
+
+  const n = parseLinesArg(50);
+  const content = readFileSync(LOG_PATH, 'utf8');
+  const lines = content.split('\n');
+  const tail = lines.slice(-n).join('\n');
+
+  if (JSON_FLAG) {
+    console.log(JSON.stringify({ path: LOG_PATH, totalLines: lines.length, lines: lines.slice(-n) }));
+  } else {
+    console.log(`--- ${LOG_PATH} (last ${n} lines) ---\n`);
+    process.stdout.write(tail);
+    if (!tail.endsWith('\n')) process.stdout.write('\n');
+  }
+}
+
+function diff() {
+  const pathOverride = parsePathArg();
+  const install = resolveInstallation(pathOverride);
+
+  if (!install || !install.type) {
+    console.error('Could not find Claude Code installation.');
+    process.exit(1);
+  }
+
+  const backup = backupPath(install.path);
+  if (!existsSync(backup)) {
+    console.log('No backup found — Claude Code is not patched (or was patched without backup).');
+    return;
+  }
+
+  if (JSON_FLAG) {
+    const meta = install.type === 'native' ? readPatchMeta(install.path) : null;
+    console.log(JSON.stringify({
+      type: install.type,
+      path: install.path,
+      backup,
+      meta,
+    }, null, 2));
+    return;
+  }
+
+  console.log(`Type:    ${install.type}`);
+  console.log(`Current: ${install.path}`);
+  console.log(`Backup:  ${backup}\n`);
+
+  if (install.type === 'npm') {
+    // Text diff for npm cli.js
+    try {
+      const out = execFileSync('diff', ['-u', backup, install.path], {
+        encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'],
+      });
+      console.log(out || 'Files are identical.');
+    } catch (err) {
+      // diff exits 1 when files differ — that's the normal case
+      if (err.stdout) {
+        process.stdout.write(err.stdout);
+      } else {
+        console.log('Could not run diff.');
+      }
+    }
+  } else {
+    // Binary diff — show metadata and size comparison
+    const meta = readPatchMeta(install.path);
+    if (meta) {
+      console.log('Patch metadata:');
+      console.log(`  Version:     ${meta.version || '?'}`);
+      console.log(`  Patched at:  ${meta.patchedAt}`);
+      console.log(`  Regex tier:  ${meta.regexTier} (${meta.regexTierDesc})`);
+      console.log(`  Growth:      ${meta.growth} bytes`);
+      console.log(`  Source size:  ${meta.sourceSizeOriginal} → ${meta.sourceSizePatched}`);
+    } else {
+      console.log('No patch metadata found.');
+    }
+
+    const currentSize = statSync(install.path).size;
+    const backupSize = statSync(backup).size;
+    console.log(`\nFile size: ${backupSize} → ${currentSize} (${currentSize === backupSize ? 'same' : 'changed'})`);
   }
 }
 
@@ -241,6 +383,19 @@ function parsePathArg() {
   if (idx === -1 || idx + 1 >= process.argv.length) return null;
   return process.argv[idx + 1];
 }
+
+/**
+ * Parse --lines <N> from argv (default 50).
+ */
+function parseLinesArg(def = 50) {
+  const idx = process.argv.indexOf('--lines');
+  if (idx === -1 || idx + 1 >= process.argv.length) return def;
+  const n = parseInt(process.argv[idx + 1], 10);
+  return n > 0 ? n : def;
+}
+
+const JSON_FLAG = process.argv.includes('--json');
+const VERBOSE_FLAG = process.argv.includes('--verbose');
 
 /**
  * Resolve the target installation. Supports --path override.
@@ -303,6 +458,12 @@ function patch() {
   log(`Detected: ${install.type} installation`);
   log(`Path:     ${install.path}`);
   if (install.version) log(`Version:  ${install.version}`);
+  if (VERBOSE_FLAG) {
+    const { config: cfg, configPath: cfgPath } = loadConfig(process.cwd());
+    if (cfgPath) log(`Config:   ${cfgPath}`);
+    log(`Patterns: ${cfg.patterns.join(', ')}`);
+    log(`Cache:    ${cfg.cache ? 'enabled' : 'disabled'}`);
+  }
   if (!auto) console.log();
 
   let result;
@@ -327,6 +488,17 @@ function patch() {
 
   if (result.success) {
     log(result.message);
+    if (VERBOSE_FLAG && install.type === 'native') {
+      const meta = readPatchMeta(install.path);
+      if (meta) {
+        log(`\nVerbose patch details:`);
+        log(`  Regex tier:     ${meta.regexTier} (${meta.regexTierDesc})`);
+        log(`  Source growth:   ${meta.growth} bytes`);
+        log(`  Source original: ${meta.sourceSizeOriginal} bytes`);
+        log(`  Source patched:  ${meta.sourceSizePatched} bytes`);
+        log(`  Size locations:  ${meta.sizeLocations}`);
+      }
+    }
     if (!dryRun && !auto) {
       console.log('\nRestart Claude Code for the patch to take effect.');
       console.log('AGENTS.md files will now be loaded alongside CLAUDE.md.');
@@ -398,7 +570,7 @@ function unwatch() {
 
 // CLI dispatch
 const command = process.argv[2];
-const commands = { setup, remove, status, doctor, preview, patch, unpatch, watch, unwatch };
+const commands = { setup, remove, status, doctor, preview, patch, unpatch, watch, unwatch, logs, diff };
 
 if (!command || command === '--help' || command === '-h') {
   console.log(`cc-agents-md — Load AGENTS.md into Claude Code sessions
@@ -416,9 +588,18 @@ Experimental:
   cc-agents-md watch     Auto-repatch after upgrades (macOS/Linux)
   cc-agents-md unwatch   Remove the auto-repatch watcher
 
+Diagnostics:
+  cc-agents-md logs      Show auto-repatch watcher log
+  cc-agents-md diff      Show what the patch changed
+
 Patch options:
   --dry-run        Show what would be patched without modifying files
   --force          Required for native binary patching (Homebrew)
+  --verbose        Show detailed patch info (regex tier, byte offsets)
+
+Output options:
+  --json           Machine-readable JSON (status, doctor, preview, logs, diff)
+  --lines N        Number of log lines to show (default: 50)
 
 Options:
   --help, -h       Show this help
