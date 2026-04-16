@@ -120,9 +120,13 @@ function status() {
   const { config, configPath } = loadConfig(cwd);
   const files = findAgentsMd(cwd, root);
   const fileDetails = files.map(f => {
-    const lines = readFileSync(f, 'utf8').split('\n').length;
-    const rel = f.startsWith(root) ? f.slice(root.length + 1) || 'AGENTS.md' : f;
-    return { path: f, rel, lines };
+    try {
+      const lines = readFileSync(f, 'utf8').split('\n').length;
+      const rel = f.startsWith(root) ? f.slice(root.length + 1) || 'AGENTS.md' : f;
+      return { path: f, rel, lines };
+    } catch {
+      return { path: f, rel: f, lines: 0, error: 'unreadable' };
+    }
   });
 
   if (JSON_FLAG) {
@@ -342,6 +346,12 @@ function diff() {
 
   if (install.type === 'npm') {
     // Text diff for npm cli.js
+    if (process.platform === 'win32') {
+      console.log('Unified diff not available on Windows. Compare manually:');
+      console.log(`  Original: ${backup}`);
+      console.log(`  Current:  ${install.path}`);
+      return;
+    }
     try {
       const out = execFileSync('diff', ['-u', backup, install.path], {
         encoding: 'utf8', stdio: ['pipe', 'pipe', 'pipe'],

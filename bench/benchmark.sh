@@ -18,11 +18,15 @@ fi
 now_ms() {
   if command -v gdate >/dev/null 2>&1; then
     echo $(($(gdate +%s%N) / 1000000))
-  elif date +%s%N >/dev/null 2>&1; then
-    echo $(($(date +%s%N) / 1000000))
   else
-    # macOS fallback: python3 milliseconds
-    python3 -c 'import time; print(int(time.time()*1000))'
+    local ts
+    ts="$(date +%s%N 2>/dev/null)"
+    if [[ "$ts" =~ ^[0-9]+$ ]]; then
+      echo $((ts / 1000000))
+    else
+      # macOS fallback: python3 milliseconds
+      python3 -c 'import time; print(int(time.time()*1000))'
+    fi
   fi
 }
 

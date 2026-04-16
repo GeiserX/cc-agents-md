@@ -80,7 +80,7 @@ if ($files.Count -eq 0) { exit 0 }
 $cacheDir = Join-Path $env:USERPROFILE '.claude' 'cc-agents-md-cache'
 
 if ($cacheEnabled) {
-  $cacheInput = ''
+  $cacheInput = "t=${threshold}:p=$($patterns -join ','):e=$($excludeDirs -join ','):"
   foreach ($f in $files) {
     $mtime = (Get-Item $f -Force).LastWriteTimeUtc.Ticks
     $cacheInput += "${f}:${mtime}:"

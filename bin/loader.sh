@@ -14,6 +14,8 @@ PROJECT="$(cd "$PROJECT" 2>/dev/null && pwd -P)" || exit 0
 ROOT="$(git -C "$PROJECT" rev-parse --show-toplevel 2>/dev/null)" || ROOT="$PROJECT"
 
 # --- Load .agents-md.json config via Node (if available) ---
+# Node is optional — the loader runs with zero hard dependencies.
+# If node is not installed, the loader falls back to defaults and env vars.
 INLINE_THRESHOLD="${AGENTS_MD_INLINE_THRESHOLD:-200}"
 PATTERNS="${AGENTS_MD_PATTERNS:-AGENTS.md}"
 EXCLUDE="${AGENTS_MD_EXCLUDE:-}"
