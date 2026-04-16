@@ -5,7 +5,7 @@ const { copyFileSync, unlinkSync, existsSync, chmodSync, statSync, readFileSync,
 const { join, dirname, relative } = require('path');
 const { execSync, execFileSync } = require('child_process');
 const { mkdirSync } = require('fs');
-const { readSettings, writeSettings, isInstalled, addHook, removeHook } = require('../lib/settings');
+const { readSettings, writeSettings, isInstalled, isEventRegistered, addHook, removeHook, HOOK_EVENTS } = require('../lib/settings');
 const { detectInstallation, detectNpm, detectNative } = require('../lib/detect');
 const { patchNpm, unpatchNpm, isPatched: isPatchedSource, backupPath } = require('../lib/patcher');
 const { patchNative, unpatchNative } = require('../lib/patch-native');
@@ -85,7 +85,9 @@ function setup() {
   console.log('Installed successfully.');
   console.log(`  Hook script: ${HOOK_SCRIPT}`);
   console.log(`  Settings:    ${SETTINGS_PATH}`);
-  console.log('\nRestart Claude Code for changes to take effect.');
+  console.log(`  Hooks:       SessionStart, UserPromptSubmit, PreCompact`);
+  console.log('\nAGENTS.md changes are detected mid-session and instructions survive context compression.');
+  console.log('Restart Claude Code for changes to take effect.');
 }
 
 function remove() {
@@ -129,10 +131,17 @@ function status() {
     }
   });
 
+  // Check all three hook events
+  const hookEvents = {};
+  for (const event of HOOK_EVENTS) {
+    hookEvents[event] = isEventRegistered(settings, event);
+  }
+
   if (JSON_FLAG) {
     console.log(JSON.stringify({
       hookInstalled: installed,
       hookScript: scriptExists ? HOOK_SCRIPT : null,
+      hookEvents,
       project: cwd,
       gitRoot: root,
       config: configPath ? { path: configPath, ...config } : null,
@@ -143,6 +152,7 @@ function status() {
 
   console.log(`Hook installed: ${installed ? 'yes' : 'no'}`);
   console.log(`Hook script:    ${scriptExists ? 'exists' : 'missing'}`);
+  console.log(`Hook events:    ${HOOK_EVENTS.map(e => `${e} ${hookEvents[e] ? 'yes' : 'no'}`).join(', ')}`);
 
   console.log(`\nProject:  ${cwd}`);
   console.log(`Git root: ${root}`);
@@ -183,6 +193,11 @@ function doctor() {
   const settings = readSettings(SETTINGS_PATH);
   check('Hook registered in settings.json', isInstalled(settings, HOOK_SCRIPT));
   check('Hook script exists', existsSync(HOOK_SCRIPT), HOOK_SCRIPT);
+
+  // Check all three hook events
+  for (const event of HOOK_EVENTS) {
+    check(`${event} hook registered`, isEventRegistered(settings, event, HOOK_SCRIPT) || isEventRegistered(settings, event));
+  }
 
   if (existsSync(HOOK_SCRIPT) && process.platform !== 'win32') {
     const stat = statSync(HOOK_SCRIPT);
@@ -694,7 +709,7 @@ if (!command || command === '--help' || command === '-h') {
   console.log(`cc-agents-md — Load AGENTS.md into Claude Code sessions
 
 Usage:
-  cc-agents-md setup     Install the SessionStart hook
+  cc-agents-md setup     Install hooks (SessionStart + mid-session reload)
   cc-agents-md remove    Uninstall completely
   cc-agents-md status    Show installation state and detected files
   cc-agents-md doctor    Full health check

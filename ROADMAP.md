@@ -193,7 +193,7 @@ Environment variables (`AGENTS_MD_INLINE_THRESHOLD`, `AGENTS_MD_PATTERNS`, `AGEN
 
 ---
 
-### v0.8.0 (current) — Migration tool
+### v0.8.0 (current) — Migration tool, mid-session reload, context preservation
 
 - **`cc-agents-md migrate`** — Convert existing CLAUDE.md files to AGENTS.md format. Walks from CWD to git root, finds all CLAUDE.md / CLAUDE.local.md / .claude/CLAUDE.md files, copies them to their AGENTS.md equivalents, and strips `@AGENTS.md` import references that are no longer needed after migration.
   - `--dry-run` — Preview what would be migrated without making changes
@@ -201,12 +201,17 @@ Environment variables (`AGENTS_MD_INLINE_THRESHOLD`, `AGENTS_MD_PATTERNS`, `AGEN
   - `--json` — Machine-readable output
   - Skips files where the target AGENTS.md already exists (with warning)
 
+- **Mid-session reload** — Detects AGENTS.md changes during a running session via a `UserPromptSubmit` hook. On each user prompt, the loader compares the current file hash against a last-injected marker. If files changed, the updated content is re-injected as `additionalContext`. If unchanged, the hook exits silently with zero overhead.
+
+- **Context preservation** — A `PreCompact` hook re-injects AGENTS.md content before context compression, ensuring instructions survive in long sessions where the context window fills up and gets compacted. Always re-injects (no change detection needed — the goal is to preserve instructions).
+
+Both new hooks use JSON output (`{"additionalContext": "..."}`) as required by the Claude Code hook API for `UserPromptSubmit` and `PreCompact` events. The `setup` command now registers all three hooks automatically.
+
 ---
 
 ## Future ideas
 
 - **Official support** — Lobby Anthropic to add native AGENTS.md support to Claude Code ([anthropics/claude-code#6235](https://github.com/anthropics/claude-code/issues/6235), 3,600+ upvotes)
-- **Mid-session reload** — Detect AGENTS.md changes during a running session and re-inject via `UserPromptSubmit` hook with `additionalContext` (feasible today — stat-based change detection on each prompt)
 - **Monorepo awareness** — Load AGENTS.md from sibling packages in monorepos, not just ancestor directories
 - **CI/CD integration** — GitHub Action / pre-commit hook that validates AGENTS.md files (syntax, size, conflicts)
 - **Plugin system** — Allow custom transformers that process AGENTS.md content before injection (variable substitution, conditional sections)
