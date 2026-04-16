@@ -193,11 +193,20 @@ Environment variables (`AGENTS_MD_INLINE_THRESHOLD`, `AGENTS_MD_PATTERNS`, `AGEN
 
 ---
 
+### v0.8.0 — Migration tool
+
+- **`cc-agents-md migrate`** — Convert existing CLAUDE.md files to AGENTS.md format. Walks from CWD to git root, finds all CLAUDE.md / CLAUDE.local.md / .claude/CLAUDE.md files, copies them to their AGENTS.md equivalents, and strips `@AGENTS.md` import references that are no longer needed after migration.
+  - `--dry-run` — Preview what would be migrated without making changes
+  - `--delete` — Delete original CLAUDE.md files after copying (default: keep originals)
+  - `--json` — Machine-readable output
+  - Skips files where the target AGENTS.md already exists (with warning)
+
+---
+
 ## Future ideas
 
 - **Official support** — Lobby Anthropic to add native AGENTS.md support to Claude Code ([anthropics/claude-code#6235](https://github.com/anthropics/claude-code/issues/6235), 3,600+ upvotes)
 - **Mid-session reload** — Detect AGENTS.md changes during a running session and re-inject (requires Claude Code hook API expansion)
 - **Monorepo awareness** — Load AGENTS.md from sibling packages in monorepos, not just ancestor directories
 - **CI/CD integration** — GitHub Action / pre-commit hook that validates AGENTS.md files (syntax, size, conflicts)
-- **Migration tool** — `cc-agents-md migrate` to convert existing CLAUDE.md files to AGENTS.md format
 - **Plugin system** — Allow custom transformers that process AGENTS.md content before injection (variable substitution, conditional sections)

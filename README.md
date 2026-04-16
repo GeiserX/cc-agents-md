@@ -64,6 +64,7 @@ npx cc-agents-md remove
 | `status`  | Show installation state and detected AGENTS.md     |
 | `doctor`  | Full health check (hook, patch, watcher, config)   |
 | `preview` | Print exactly what Claude would see                |
+| `migrate` | Convert CLAUDE.md files to AGENTS.md format        |
 | `patch`   | **Experimental** — patch Claude Code internals     |
 | `unpatch` | Restore Claude Code to original state              |
 | `watch`   | Auto-repatch after Claude Code upgrades (macOS/Linux) |
