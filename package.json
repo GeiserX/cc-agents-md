@@ -1,6 +1,6 @@
 {
   "name": "cc-agents-md",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "description": "Load AGENTS.md into Claude Code sessions — no CLAUDE.md needed",
   "license": "GPL-3.0-only",
   "author": "GeiserX",
