@@ -196,6 +196,23 @@ A general-purpose Claude Code patcher with 40+ patches (themes, prompts, tools, 
 - Node.js >= 18 (for the CLI only — the runtime hook is pure bash / PowerShell)
 - bash (macOS/Linux) or PowerShell (Windows)
 
+## Troubleshooting
+
+### macOS: Gatekeeper blocks Claude Code after patching or upgrade
+
+After `brew upgrade claude-code`, macOS may quarantine the new binary, preventing it from opening. The `patch` command removes the quarantine flag automatically (`xattr -dr com.apple.quarantine`), but if the binary is blocked before the watcher can repatch:
+
+```bash
+xattr -d com.apple.quarantine /opt/homebrew/Caskroom/claude-code/*/claude
+```
+
+To prevent this permanently, tell Homebrew to skip quarantine on all cask installs:
+
+```bash
+echo 'export HOMEBREW_CASK_OPTS="--no-quarantine"' >> ~/.zshrc
+source ~/.zshrc
+```
+
 ## License
 
 GPL-3.0 — see [LICENSE](LICENSE).
