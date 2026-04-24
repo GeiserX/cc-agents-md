@@ -215,4 +215,29 @@ describe('patcher.js', () => {
 
     rmSync(dir, { recursive: true, force: true });
   });
+
+  it('unpatchNpm fails when patched but no backup exists', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'patcher-test-'));
+    const cliJs = join(dir, 'cli.js');
+    const { patched } = patchSource(MOCK_SOURCE);
+    writeFileSync(cliJs, patched);
+
+    const result = unpatchNpm(cliJs);
+    assert.strictEqual(result.success, false);
+    assert.ok(result.message.includes('no backup'));
+
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it('unpatchNpm fails on missing file', () => {
+    const result = unpatchNpm('/nonexistent/cli.js');
+    assert.strictEqual(result.success, false);
+    assert.ok(result.message.includes('not found'));
+  });
+
+  // --- backupPath ---
+
+  it('backupPath appends correct suffix', () => {
+    assert.strictEqual(backupPath('/usr/lib/cli.js'), '/usr/lib/cli.js.cc-agents-md.bak');
+  });
 });
