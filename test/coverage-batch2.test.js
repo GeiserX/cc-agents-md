@@ -145,17 +145,19 @@ describe('watch.js — installLinux and removeLinux', () => {
 });
 
 describe('watch.js — statusLinux', () => {
-  it('returns installed true after installLinux creates units', () => {
-    const { installLinux, statusLinux, removeLinux } = require('../lib/watch');
-    // Install first to create unit files
-    installLinux();
-    const result = statusLinux();
-    assert.strictEqual(result.installed, true);
-    // loaded will be false on non-Linux (systemctl not available)
-    assert.strictEqual(result.loaded, false);
-    assert.ok(result.unitPath.includes('cc-agents-md-repatch.path'));
-    // Clean up
-    removeLinux();
+  it('returns installed true when unit file exists', () => {
+    const { statusLinux, LINUX_PATH_UNIT } = require('../lib/watch');
+    const unitDir = join(LINUX_PATH_UNIT, '..');
+    mkdirSync(unitDir, { recursive: true });
+    writeFileSync(LINUX_PATH_UNIT, 'placeholder');
+    try {
+      const result = statusLinux();
+      assert.strictEqual(result.installed, true);
+      assert.strictEqual(result.loaded, false);
+      assert.ok(result.unitPath.includes('cc-agents-md-repatch.path'));
+    } finally {
+      try { rmSync(LINUX_PATH_UNIT); } catch { /* ok */ }
+    }
   });
 
   it('returns installed false when units do not exist', () => {
