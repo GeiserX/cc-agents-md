@@ -6,6 +6,7 @@
   <a href="https://github.com/GeiserX/cc-agents-md/actions/workflows/ci.yml"><img src="https://github.com/GeiserX/cc-agents-md/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
   <a href="https://www.npmjs.com/package/cc-agents-md"><img src="https://img.shields.io/npm/v/cc-agents-md" alt="npm version"></a>
   <a href="https://www.gnu.org/licenses/gpl-3.0"><img src="https://img.shields.io/badge/License-GPL--3.0-blue.svg" alt="License: GPL-3.0"></a>
+  <a href="https://codecov.io/gh/GeiserX/cc-agents-md"><img src="https://codecov.io/gh/GeiserX/cc-agents-md/graph/badge.svg" alt="Codecov"></a>
 </p>
 
 Claude Code only reads `CLAUDE.md`. The [AGENTS.md specification](https://agents.md) is supported by 23+ tools (Codex, Cursor, Copilot, Gemini CLI, and more), but Claude Code is not one of them. This has been the [most requested feature](https://github.com/anthropics/claude-code/issues/6235) (3,600+ upvotes) with no official response.
