@@ -15,7 +15,9 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, macos-latest]
-        node-version: [18, 20, 22]
+        # Node 18 reached end-of-life in Apr 2025; actions/setup-node v7 and
+        # current deps no longer support it, which broke every dependency bump.
+        node-version: [20, 22, 24]
     steps:
       - uses: actions/checkout@v7
 
